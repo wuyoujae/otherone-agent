@@ -4,9 +4,9 @@ import { ConfigOptions } from './types';
 /**
  * 作用：创建OpenAI客户端并发送聊天请求
  * 关联：被InvokeModel通过openai/index.ts调用，使用OpenAI SDK
- * 预期结果：返回OpenAI API的响应内容
+ * 预期结果：返回OpenAI API的响应对象（普通响应或流式响应）
  */
-export async function CreateOpenAIClient(options: ConfigOptions): Promise<string> {
+export async function CreateOpenAIClient(options: ConfigOptions): Promise<any> {
     // OpenAI专用参数检查
     if (!options.model) {
         throw new Error('model is required for OpenAI');
@@ -73,16 +73,9 @@ export async function CreateOpenAIClient(options: ConfigOptions): Promise<string
         Object.assign(requestParams, options.other.chat);
     }
 
-    // 发送请求
+    // 发送请求并直接返回completion对象
+    // 如果stream为true，返回Stream对象；否则返回ChatCompletion对象
     const completion = await inferenceClient.chat.completions.create(requestParams as any);
-
-    // 处理流式响应
-    if (options.stream) {
-        // 流式响应需要特殊处理，这里暂时返回空字符串
-        // TODO: 实现流式响应处理
-        return '';
-    }
-
-    // 返回响应内容
-    return completion.choices[0].message.content || '';
+    
+    return completion;
 }

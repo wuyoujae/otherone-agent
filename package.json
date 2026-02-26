@@ -12,5 +12,8 @@
   "type": "commonjs",
   "dependencies": {
     "openai": "^6.25.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.3.1"
   }
 }

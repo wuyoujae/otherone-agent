@@ -1,0 +1,82 @@
+{
+  "sessions": [
+    {
+      "session_id": "550e8400-e29b-41d4-a716-446655440000",
+      "name": "测试会话1",
+      "status": 0,
+      "create_at": "2024-01-01T00:00:00.000Z"
+    },
+    {
+      "session_id": "550e8400-e29b-41d4-a716-446655440001",
+      "name": "测试会话2",
+      "status": 0,
+      "create_at": "2024-01-02T00:00:00.000Z"
+    }
+  ],
+  "entries": [
+    {
+      "entry_id": "660e8400-e29b-41d4-a716-446655440001",
+      "session_id": "550e8400-e29b-41d4-a716-446655440000",
+      "content": "你好，这是第一条测试消息",
+      "role": "user",
+      "token_consumption": 10,
+      "status": 0,
+      "tools": null,
+      "create_at": "2024-01-01T00:00:00.000Z",
+      "is_compaction": 1
+    },
+    {
+      "entry_id": "660e8400-e29b-41d4-a716-446655440002",
+      "session_id": "550e8400-e29b-41d4-a716-446655440000",
+      "content": "你好！我是AI助手，很高兴为你服务。",
+      "role": "assistant",
+      "token_consumption": 15,
+      "status": 0,
+      "tools": null,
+      "create_at": "2024-01-01T00:00:01.000Z",
+      "is_compaction": 1
+    },
+    {
+      "entry_id": "660e8400-e29b-41d4-a716-446655440003",
+      "session_id": "550e8400-e29b-41d4-a716-446655440000",
+      "content": "北京今天天气怎么样？",
+      "role": "user",
+      "token_consumption": 12,
+      "status": 0,
+      "tools": null,
+      "create_at": "2024-01-01T00:00:02.000Z",
+      "is_compaction": 1
+    },
+    {
+      "entry_id": "660e8400-e29b-41d4-a716-446655440004",
+      "session_id": "550e8400-e29b-41d4-a716-446655440000",
+      "content": "让我帮你查询一下北京的天气。",
+      "role": "assistant",
+      "token_consumption": 20,
+      "status": 0,
+      "tools": {
+        "tool_calls": [
+          {
+            "id": "call_123",
+            "type": "function",
+            "function": {
+              "name": "get_weather",
+              "arguments": "{\"city\":\"北京\"}"
+            }
+          }
+        ]
+      },
+      "create_at": "2024-01-01T00:00:03.000Z",
+      "is_compaction": 1
+    }
+  ],
+  "compacted_dialogues": [
+    {
+      "entry_id": "770e8400-e29b-41d4-a716-446655440001",
+      "trigger_entry_id": "660e8400-e29b-41d4-a716-446655440010",
+      "summary": "用户询问了天气情况，助手提供了北京的天气信息。对话涉及天气查询工具的使用。",
+      "create_at": "2024-01-01T00:10:00.000Z",
+      "status": 0
+    }
+  ]
+}

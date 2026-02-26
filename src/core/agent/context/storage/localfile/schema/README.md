@@ -42,7 +42,7 @@
 **字段说明：**
 - `entry_id` (string): 消息ID，使用UUID
 - `session_id` (string): 关联的会话ID
-- `message` (string): 消息内容
+- `content` (string): 消息内容
 - `role` (string): 角色（user/assistant/system）
 - `token_consumption` (number): 这次对话消耗的token数
 - `status` (number): 消息状态，0-正常使用，1-不使用
@@ -71,7 +71,7 @@
 {
   "entry_id": "660e8400-e29b-41d4-a716-446655440001",
   "session_id": "550e8400-e29b-41d4-a716-446655440000",
-  "message": "北京今天天气怎么样？",
+  "content": "北京今天天气怎么样？",
   "role": "user",
   "token_consumption": 12,
   "status": 0,

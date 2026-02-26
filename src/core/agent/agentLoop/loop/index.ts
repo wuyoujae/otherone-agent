@@ -16,7 +16,8 @@ export async function InvokeAgent(input: InputOptions, ai: AIOptions): Promise<a
         // 组合context配置，加载历史消息
         const messages = CombineContext({
             sessionId: input.sessionId,
-            loadType: input.contextLoadType
+            loadType: input.contextLoadType,
+            provider: ai.provider
         });
         
         // 将历史消息添加到ai配置中

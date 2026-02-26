@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS veloca_session (
 CREATE TABLE IF NOT EXISTS veloca_entries (
     entry_id VARCHAR(36) PRIMARY KEY COMMENT '消息ID，使用UUID',
     session_id VARCHAR(36) NOT NULL COMMENT '关联的会话ID',
-    message LONGTEXT NOT NULL COMMENT '消息内容',
+    content LONGTEXT NOT NULL COMMENT '消息内容',
     role VARCHAR(50) NOT NULL COMMENT '角色',
     token_consumption INT DEFAULT 0 COMMENT '这次对话消耗的token数',
     status TINYINT NOT NULL DEFAULT 0 COMMENT '消息状态：0-正常使用，1-不使用',

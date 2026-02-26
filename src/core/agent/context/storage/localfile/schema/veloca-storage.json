@@ -11,7 +11,7 @@
     {
       "entry_id": "uuid-example-1",
       "session_id": "uuid-example-1",
-      "message": "你好，这是一条示例消息",
+      "content": "你好，这是一条示例消息",
       "role": "user",
       "token_consumption": 10,
       "status": 0,
@@ -22,7 +22,7 @@
     {
       "entry_id": "uuid-example-2",
       "session_id": "uuid-example-1",
-      "message": "你好！我是AI助手",
+      "content": "你好！我是AI助手",
       "role": "assistant",
       "token_consumption": 15,
       "status": 0,

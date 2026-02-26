@@ -7,6 +7,9 @@
 // Context加载类型
 export type ContextLoadType = 'database' | 'localfile';
 
+// AI提供商类型
+export type ProviderType = 'openai' | 'anthropic' | 'fetch';
+
 // Input参数类型定义
 export interface InputOptions {
     // 会话ID
@@ -17,6 +20,8 @@ export interface InputOptions {
 
 // AI配置参数类型定义
 export interface AIOptions {
+    // AI提供商类型
+    provider: ProviderType;
     // 消息列表
     messages?: any[];
 }

@@ -4,12 +4,19 @@
  * 预期结果：提供清晰的类型定义，便于后续扩展
  */
 
+// Context加载类型
+export type ContextLoadType = 'database' | 'localfile';
+
 // Input参数类型定义
 export interface InputOptions {
-    // TODO: 定义input的具体字段
+    // 会话ID
+    sessionId: string;
+    // Context加载类型
+    contextLoadType: ContextLoadType;
 }
 
 // AI配置参数类型定义
 export interface AIOptions {
-    // TODO: 定义ai的具体字段
+    // 消息列表
+    messages?: any[];
 }

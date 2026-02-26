@@ -1,0 +1,54 @@
+{
+  "sessions": [
+    {
+      "session_id": "uuid-example-1",
+      "name": "示例会话1",
+      "status": 0,
+      "create_at": "2024-01-01T00:00:00.000Z"
+    }
+  ],
+  "entries": [
+    {
+      "entry_id": "uuid-example-1",
+      "session_id": "uuid-example-1",
+      "message": "你好，这是一条示例消息",
+      "role": "user",
+      "token_consumption": 10,
+      "status": 0,
+      "tools": null,
+      "create_at": "2024-01-01T00:00:00.000Z",
+      "is_compaction": 1
+    },
+    {
+      "entry_id": "uuid-example-2",
+      "session_id": "uuid-example-1",
+      "message": "你好！我是AI助手",
+      "role": "assistant",
+      "token_consumption": 15,
+      "status": 0,
+      "tools": {
+        "tool_calls": [
+          {
+            "id": "call_123",
+            "type": "function",
+            "function": {
+              "name": "get_weather",
+              "arguments": "{\"city\":\"北京\"}"
+            }
+          }
+        ]
+      },
+      "create_at": "2024-01-01T00:00:01.000Z",
+      "is_compaction": 1
+    }
+  ],
+  "compacted_dialogues": [
+    {
+      "entry_id": "uuid-example-1",
+      "trigger_entry_id": "uuid-example-10",
+      "summary": "这是一段压缩后的对话摘要内容",
+      "create_at": "2024-01-01T00:10:00.000Z",
+      "status": 0
+    }
+  ]
+}

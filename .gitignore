@@ -147,3 +147,6 @@ vite.config.ts.timestamp-*
 AGENTS.md
 
 test-script
+
+# veloca runtime data
+.veloca/

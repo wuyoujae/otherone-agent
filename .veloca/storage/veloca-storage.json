@@ -11,6 +11,18 @@
       "name": "测试会话2",
       "status": 0,
       "create_at": "2024-01-02T00:00:00.000Z"
+    },
+    {
+      "session_id": "999e8400-e29b-41d4-a716-446655440999",
+      "name": "测试1-流式响应",
+      "status": 0,
+      "create_at": "2026-02-26T17:48:26.121Z"
+    },
+    {
+      "session_id": "888e8400-e29b-41d4-a716-446655440888",
+      "name": "测试3-Function调用",
+      "status": 0,
+      "create_at": "2026-02-26T17:48:37.061Z"
     }
   ],
   "entries": [
@@ -67,6 +79,39 @@
         ]
       },
       "create_at": "2024-01-01T00:00:03.000Z",
+      "is_compaction": 1
+    },
+    {
+      "entry_id": "999e8400-e29b-41d4-a716-111111111111",
+      "session_id": "999e8400-e29b-41d4-a716-446655440999",
+      "content": "你好，请简单介绍一下你自己。",
+      "role": "user",
+      "token_consumption": 10,
+      "status": 0,
+      "tools": null,
+      "create_at": "2026-02-26T17:48:26.122Z",
+      "is_compaction": 1
+    },
+    {
+      "entry_id": "660e8400-e29b-41d4-a716-446655440099",
+      "session_id": "550e8400-e29b-41d4-a716-446655440000",
+      "content": "我刚才问了什么问题？",
+      "role": "user",
+      "token_consumption": 8,
+      "status": 0,
+      "tools": null,
+      "create_at": "2026-02-26T17:48:32.629Z",
+      "is_compaction": 1
+    },
+    {
+      "entry_id": "888e8400-e29b-41d4-a716-111111111111",
+      "session_id": "888e8400-e29b-41d4-a716-446655440888",
+      "content": "上海今天天气怎么样？",
+      "role": "user",
+      "token_consumption": 10,
+      "status": 0,
+      "tools": null,
+      "create_at": "2026-02-26T17:48:37.061Z",
       "is_compaction": 1
     }
   ],

@@ -1,6 +1,7 @@
 import { InputOptions, AIOptions } from './types';
 import { CombineTools } from '../../tools';
 import { CombineContext } from '../../context/combineContext';
+import { InvokeModel } from '../ai';
 
 /**
  * 作用：调用Agent，驱动整个AI对话流程
@@ -22,5 +23,11 @@ export async function InvokeAgent(input: InputOptions, ai: AIOptions): Promise<a
         
         // 将历史消息添加到ai配置中
         ai.messages = messages;
+        
+        // 调用AI模型
+        const response = await InvokeModel(ai);
+        
+        // 返回响应（第一阶段测试，直接返回）
+        return response;
     }
 }

@@ -22,6 +22,28 @@ export interface InputOptions {
 export interface AIOptions {
     // AI提供商类型
     provider: ProviderType;
+    // API密钥
+    apiKey: string;
+    // 基础URL
+    baseUrl: string;
+    // 模型名称
+    model: string;
     // 消息列表
     messages?: any[];
+    // 上下文长度限制
+    contextLength?: number;
+    // 采样温度
+    temperature?: number;
+    // 核采样参数
+    topP?: number;
+    // 工具定义数组
+    tools?: any[];
+    // 控制工具调用行为
+    toolChoice?: 'none' | 'auto' | 'required' | { type: 'function'; function: { name: string } };
+    // 是否启用并行工具调用
+    parallelToolCalls?: boolean;
+    // 启用流式响应
+    stream?: boolean;
+    // 其他兼容参数
+    other?: any;
 }

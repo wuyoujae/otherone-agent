@@ -4,7 +4,7 @@ import { CreateOpenAIClient } from './openai/client';
 
 /**
  * 作用：调用AI模型并返回对应提供商的响应
- * 关联：被messageLoop模块调用，用于发送AI对话请求
+ * 关联：被agentLoop模块调用，用于发送AI对话请求
  * 预期结果：根据provider类型调用对应的API并返回响应对象，参数无效时抛出错误
  */
 export async function InvokeModel(options: BaseConfigOptions | OpenAIConfigOptions): Promise<any> {

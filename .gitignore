@@ -144,6 +144,6 @@ vite.config.ts.timestamp-*
 .vite/
 
 .claude
-CLAUDE.md
+AGENTS.md
 
 test-script

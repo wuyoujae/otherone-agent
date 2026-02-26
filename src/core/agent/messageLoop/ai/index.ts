@@ -1,5 +1,6 @@
 import { ConfigOptions as BaseConfigOptions } from './types';
-import { CreateOpenAIClient, ConfigOptions as OpenAIConfigOptions } from './openai';
+import { ConfigOptions as OpenAIConfigOptions } from './openai/types';
+import { CreateOpenAIClient } from './openai/client';
 
 /**
  * 作用：调用AI模型并返回对应提供商的响应

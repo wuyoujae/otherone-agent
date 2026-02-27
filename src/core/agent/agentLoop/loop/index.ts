@@ -2,6 +2,7 @@ import { InputOptions, AIOptions } from './types';
 import { CombineTools } from '../../tools';
 import { CombineContext } from '../../context/combineContext';
 import { InvokeModel } from '../ai';
+import { WriteEntry } from '../../context/storage';
 
 /**
  * 作用：调用Agent，驱动整个AI对话流程
@@ -36,10 +37,32 @@ export async function InvokeAgent(input: InputOptions, ai: AIOptions): Promise<a
         if (response && typeof response[Symbol.asyncIterator] === 'function') {
             // 处理流式响应
             const parsedResponse = await ParseStreamResponse(response, ai.provider);
+            
+            // 存储AI响应到storage
+            WriteEntry({
+                storageType: input.storageType || 'localfile',
+                sessionId: input.sessionId,
+                role: parsedResponse.role,
+                content: parsedResponse.content,
+                tools: parsedResponse.tools,
+                tokenConsumption: parsedResponse.token_consumption
+            });
+            
             return parsedResponse;
         } else {
             // 处理非流式响应
             const parsedResponse = ParseAIResponse(response, ai.provider);
+            
+            // 存储AI响应到storage
+            WriteEntry({
+                storageType: input.storageType || 'localfile',
+                sessionId: input.sessionId,
+                role: parsedResponse.role,
+                content: parsedResponse.content,
+                tools: parsedResponse.tools,
+                tokenConsumption: parsedResponse.token_consumption
+            });
+            
             return parsedResponse;
         }
     }

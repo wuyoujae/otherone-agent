@@ -7,6 +7,9 @@
 // Context加载类型
 export type ContextLoadType = 'database' | 'localfile';
 
+// 存储类型
+export type StorageType = 'localfile' | 'database';
+
 // AI提供商类型
 export type ProviderType = 'openai' | 'anthropic' | 'fetch';
 
@@ -16,6 +19,8 @@ export interface InputOptions {
     sessionId: string;
     // Context加载类型
     contextLoadType: ContextLoadType;
+    // 存储类型（可选，默认localfile）
+    storageType?: StorageType;
     // 模型的上下文窗口大小
     contextWindow: number;
     // 触发压缩的阈值百分比（默认0.8，即80%）

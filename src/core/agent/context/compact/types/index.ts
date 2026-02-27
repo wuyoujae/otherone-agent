@@ -18,4 +18,10 @@ export interface CompactOptions {
     ai?: any;
     // 是否已经有压缩内容（用于判断使用哪个prompt）
     hasCompactedContent?: boolean;
+    // 会话ID（用于存储压缩记录）
+    sessionId?: string;
+    // 存储类型（用于存储压缩记录）
+    storageType?: 'localfile' | 'database';
+    // 原始entries数据（用于获取entry_id）
+    originalEntries?: any[];
 }

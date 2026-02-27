@@ -1,6 +1,7 @@
 import { CompactOptions } from './types';
 import { EstimateTokens } from './estimateTokens';
 import { MessagesToSequence } from './messagesToSequence';
+import { WriteCompactedEntry } from '../storage';
 
 /**
  * 作用：压缩上下文消息，保留最新的消息，压缩旧的消息
@@ -94,6 +95,37 @@ export async function CompactMessages(options: CompactOptions): Promise<any[]> {
         role: 'user',
         content: compressedSummary
     };
+
+    // 存储压缩记录
+    if (options.sessionId && options.storageType && options.originalEntries) {
+        // 获取trigger_entry_id（切割点前一条消息对应的entry_id）
+        // cutoffIndex-1是需要压缩的最后一条消息的索引
+        // 如果有压缩内容，originalEntries[0]是压缩摘要（没有entry_id），所以要从originalEntries[cutoffIndex]获取
+        let triggerEntryId: string;
+        
+        if (options.hasCompactedContent && cutoffIndex > 0) {
+            // 有压缩内容时，originalEntries[0]是压缩摘要，实际的entry从[1]开始
+            // cutoffIndex-1是messagesToCompact的最后一条，对应originalEntries[cutoffIndex-1]
+            const triggerEntry = options.originalEntries[cutoffIndex - 1];
+            triggerEntryId = triggerEntry?.entry_id || '';
+        } else {
+            // 没有压缩内容时，直接从originalEntries获取
+            const triggerEntry = options.originalEntries[cutoffIndex - 1];
+            triggerEntryId = triggerEntry?.entry_id || '';
+        }
+        
+        // 如果没有找到trigger_entry_id，抛出错误
+        if (!triggerEntryId) {
+            throw new Error('Unable to find trigger_entry_id for compaction');
+        }
+        
+        WriteCompactedEntry({
+            storageType: options.storageType,
+            sessionId: options.sessionId,
+            summary: compressedSummary,
+            triggerEntryId: triggerEntryId
+        });
+    }
 
     // 返回压缩后的消息数组：压缩摘要 + 保留的最新消息
     return [compactedMessage, ...messagesToKeep];

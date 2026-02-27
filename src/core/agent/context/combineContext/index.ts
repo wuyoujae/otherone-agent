@@ -123,7 +123,10 @@ export async function CombineContext(options: CombineContextOptions): Promise<an
             contextTokens: contextTokens,
             contextWindow: options.contextWindow,
             ai: options.ai,
-            hasCompactedContent: hasCompactedContent
+            hasCompactedContent: hasCompactedContent,
+            sessionId: options.sessionId,
+            storageType: options.loadType,
+            originalEntries: sessionData.entries
         });
         
         return compactedMessages;

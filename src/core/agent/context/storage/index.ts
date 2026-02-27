@@ -1,43 +1,88 @@
-import { StorageOptions } from './types';
+import { WriteEntryOptions, WriteCompactedEntryOptions } from './types';
+import { WriteEntryToFile, WriteCompactedEntryToFile } from './localfile/writer';
 
 /**
- * 作用：存储管理入口，根据存储类型分发到不同的存储实现
- * 关联：被context模块调用，管理localfile和database两种存储方式
- * 预期结果：根据storage类型调用对应的存储方法
+ * 作用：写入entry数据的统一入口
+ * 关联：被loop模块、compact模块调用，用于存储用户输入、AI响应、tool结果等
+ * 预期结果：根据存储类型调用对应的writer实现
  */
-export function ManageStorage(options: StorageOptions): any {
+export function WriteEntry(options: WriteEntryOptions): void {
     // 参数有效性检查
-    if (!options.type) {
-        throw new Error('storage type is required');
+    if (!options.storageType) {
+        throw new Error('storageType is required');
     }
 
-    // 根据storage类型进行不同处理
-    switch (options.type) {
+    if (!options.sessionId) {
+        throw new Error('sessionId is required');
+    }
+
+    if (!options.role) {
+        throw new Error('role is required');
+    }
+
+    // 根据存储类型分发
+    switch (options.storageType) {
         case 'localfile':
-            return HandleLocalFileStorage(options);
+            WriteEntryToFile(options);
+            break;
         case 'database':
-            return HandleDatabaseStorage(options);
+            WriteEntryToDatabase(options);
+            break;
         default:
-            throw new Error(`Unsupported storage type: ${options.type}`);
+            throw new Error(`Unsupported storageType: ${options.storageType}`);
     }
 }
 
 /**
- * 作用：处理本地文件存储
- * 关联：被ManageStorage调用
- * 预期结果：返回本地文件存储的处理结果
+ * 作用：写入压缩记录的统一入口
+ * 关联：被compact模块调用，用于存储压缩后的摘要
+ * 预期结果：根据存储类型调用对应的writer实现
  */
-function HandleLocalFileStorage(options: StorageOptions): any {
-    // TODO: 实现本地文件存储逻辑
-    return {};
+export function WriteCompactedEntry(options: WriteCompactedEntryOptions): void {
+    // 参数有效性检查
+    if (!options.storageType) {
+        throw new Error('storageType is required');
+    }
+
+    if (!options.sessionId) {
+        throw new Error('sessionId is required');
+    }
+
+    if (!options.summary) {
+        throw new Error('summary is required');
+    }
+
+    if (!options.triggerEntryId) {
+        throw new Error('triggerEntryId is required');
+    }
+
+    // 根据存储类型分发
+    switch (options.storageType) {
+        case 'localfile':
+            WriteCompactedEntryToFile(options);
+            break;
+        case 'database':
+            WriteCompactedEntryToDatabase(options);
+            break;
+        default:
+            throw new Error(`Unsupported storageType: ${options.storageType}`);
+    }
 }
 
 /**
- * 作用：处理数据库存储
- * 关联：被ManageStorage调用
- * 预期结果：返回数据库存储的处理结果
+ * 作用：将entry写入数据库
+ * 关联：被WriteEntry调用
+ * 预期结果：将entry数据插入数据库
  */
-function HandleDatabaseStorage(options: StorageOptions): any {
-    // TODO: 实现数据库存储逻辑
-    return {};
+function WriteEntryToDatabase(options: WriteEntryOptions): void {
+    // TODO: 实现数据库写入逻辑
+}
+
+/**
+ * 作用：将压缩记录写入数据库
+ * 关联：被WriteCompactedEntry调用
+ * 预期结果：将压缩记录插入数据库
+ */
+function WriteCompactedEntryToDatabase(options: WriteCompactedEntryOptions): void {
+    // TODO: 实现数据库写入逻辑
 }

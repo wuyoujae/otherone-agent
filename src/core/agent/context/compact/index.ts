@@ -185,17 +185,21 @@ async function CallCompactLLM(
     
     const response = await InvokeModel(compactAIOptions);
     
-    // 提取压缩结果
-    // 根据不同的响应格式提取内容
+    // 根据provider类型处理不同的响应格式
     let compressedContent = '';
-    if (typeof response === 'string') {
-        compressedContent = response;
-    } else if (response.choices && response.choices[0]) {
-        compressedContent = response.choices[0].message?.content || response.choices[0].text || '';
-    } else if (response.content) {
-        compressedContent = response.content;
-    } else {
-        throw new Error('Unable to extract compressed content from LLM response');
+    
+    switch (compactLLMConfig.provider) {
+        case 'openai':
+            compressedContent = HandleOpenAIResponse(response);
+            break;
+        case 'anthropic':
+            compressedContent = HandleAnthropicResponse(response);
+            break;
+        case 'fetch':
+            compressedContent = HandleFetchResponse(response);
+            break;
+        default:
+            throw new Error(`Unsupported provider type: ${compactLLMConfig.provider}`);
     }
     
     return compressedContent;
@@ -225,4 +229,44 @@ function ExtractCompactLLMConfig(ai: any): any {
     };
 
     return compactConfig;
+}
+
+/**
+ * 作用：处理OpenAI的响应格式
+ * 关联：被CallCompactLLM调用
+ * 预期结果：返回提取的压缩内容文本
+ */
+function HandleOpenAIResponse(response: any): string {
+    // OpenAI响应格式：response.choices[0].message.content
+    if (!response.choices || !response.choices[0]) {
+        throw new Error('Invalid OpenAI response format: missing choices');
+    }
+
+    const content = response.choices[0].message?.content || response.choices[0].text || '';
+    
+    if (!content) {
+        throw new Error('Unable to extract content from OpenAI response');
+    }
+
+    return content;
+}
+
+/**
+ * 作用：处理Anthropic的响应格式
+ * 关联：被CallCompactLLM调用
+ * 预期结果：返回提取的压缩内容文本
+ */
+function HandleAnthropicResponse(response: any): string {
+    // TODO: 实现Anthropic响应处理
+    throw new Error('Anthropic response handling not implemented yet');
+}
+
+/**
+ * 作用：处理Fetch的响应格式
+ * 关联：被CallCompactLLM调用
+ * 预期结果：返回提取的压缩内容文本
+ */
+function HandleFetchResponse(response: any): string {
+    // TODO: 实现Fetch响应处理
+    throw new Error('Fetch response handling not implemented yet');
 }

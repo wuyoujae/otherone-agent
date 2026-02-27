@@ -28,8 +28,6 @@ export async function InvokeAgent(input: InputOptions, ai: AIOptions): Promise<a
         // 将历史消息添加到ai配置中
         ai.messages = messages;
         
-        
-
         // 调用AI模型
         const response = await InvokeModel(ai);
         

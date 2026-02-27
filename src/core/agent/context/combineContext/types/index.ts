@@ -18,4 +18,8 @@ export interface CombineContextOptions {
     loadType: ContextLoadType;
     // AI提供商类型
     provider: ProviderType;
+    // 模型的上下文窗口大小
+    contextWindow: number;
+    // 触发压缩的阈值百分比（默认0.8，即80%）
+    thresholdPercentage?: number;
 }

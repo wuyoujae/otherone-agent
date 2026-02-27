@@ -1,5 +1,7 @@
 import { CombineContextOptions } from './types';
 import { ReadSessionData } from '../storage/localfile/reader';
+import { CheckThreshold } from '../compact/checkThreshold';
+import { EstimateTokens } from '../compact/estimateTokens';
 
 /**
  * 作用：组合context配置，根据session_id加载历史消息
@@ -18,6 +20,10 @@ export function CombineContext(options: CombineContextOptions): any[] {
 
     if (!options.provider) {
         throw new Error('provider is required');
+    }
+
+    if (!options.contextWindow) {
+        throw new Error('contextWindow is required');
     }
 
     // 根据loadType类型加载数据
@@ -39,7 +45,70 @@ export function CombineContext(options: CombineContextOptions): any[] {
     }
 
     // 根据provider类型转换数据格式
-    return TransformToMessages(sessionData, options.provider);
+    const messages = TransformToMessages(sessionData, options.provider);
+
+    // 获取最后一条assistant消息的token_consumption
+    // 如果没有找到，继续往前找，最多找3次
+    let contextTokens = 0;
+    let foundTokenIndex = -1;
+    const assistantEntries = [...sessionData.entries]
+        .reverse()
+        .filter((entry: any) => entry.role === 'assistant');
+
+    // 最多检查3条assistant消息
+    const maxAttempts = Math.min(3, assistantEntries.length);
+    for (let i = 0; i < maxAttempts; i++) {
+        const entry = assistantEntries[i];
+        if (entry.token_consumption !== undefined && entry.token_consumption !== null) {
+            contextTokens = entry.token_consumption;
+            foundTokenIndex = sessionData.entries.indexOf(entry);
+            break;
+        }
+    }
+
+    // 如果3次都没找到token_consumption，或者找到了但最后一条消息不是assistant
+    // 需要调用EstimateTokens进行估算
+    if (contextTokens === 0 || foundTokenIndex < sessionData.entries.length - 1) {
+        let messagesToEstimate: any[];
+        
+        if (contextTokens === 0) {
+            // 没找到token_consumption，估算所有messages
+            messagesToEstimate = messages;
+        } else {
+            // 找到了token_consumption，只估算foundTokenIndex之后的messages
+            // 因为entries是反转的，所以需要计算正确的起始位置
+            const startIndex = foundTokenIndex + 1;
+            const messagesToEstimateCount = sessionData.entries.length - startIndex;
+            // messages数组是反转后的，所以从前面取messagesToEstimateCount个
+            messagesToEstimate = messages.slice(0, messagesToEstimateCount);
+        }
+        
+        const estimatedTokens = EstimateTokens({
+            messages: messagesToEstimate,
+            lastTokenIndex: foundTokenIndex >= 0 ? foundTokenIndex : undefined
+        });
+        
+        // 如果找到了token_consumption，则在其基础上加上估算值
+        // 如果没找到，则直接使用估算值
+        contextTokens = contextTokens + estimatedTokens;
+    }
+
+    // 检查是否需要压缩
+    const shouldCompress = CheckThreshold({
+        contextTokens,
+        contextWindow: options.contextWindow,
+        thresholdPercentage: options.thresholdPercentage
+    });
+
+    // 如果需要压缩
+    if (shouldCompress) {
+        // TODO: 实现压缩逻辑
+        // 暂时直接返回messages
+        return messages;
+    }
+
+    // 不需要压缩，直接返回messages
+    return messages;
 }
 
 /**

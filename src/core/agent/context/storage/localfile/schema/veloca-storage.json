@@ -16,6 +16,7 @@
       "token_consumption": 10,
       "status": 0,
       "tools": null,
+      "thinking": null,
       "create_at": "2024-01-01T00:00:00.000Z",
       "is_compaction": 1
     },
@@ -38,6 +39,7 @@
           }
         ]
       },
+      "thinking": "用户在打招呼，我应该友好地回应",
       "create_at": "2024-01-01T00:00:01.000Z",
       "is_compaction": 1
     }

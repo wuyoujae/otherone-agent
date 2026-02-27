@@ -16,6 +16,10 @@ export interface InputOptions {
     sessionId: string;
     // Context加载类型
     contextLoadType: ContextLoadType;
+    // 模型的上下文窗口大小
+    contextWindow: number;
+    // 触发压缩的阈值百分比（默认0.8，即80%）
+    thresholdPercentage?: number;
 }
 
 // AI配置参数类型定义

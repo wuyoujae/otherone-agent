@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS veloca_entries (
     token_consumption INT DEFAULT 0 COMMENT '这次对话消耗的token数',
     status TINYINT NOT NULL DEFAULT 0 COMMENT '消息状态：0-正常使用，1-不使用',
     tools TEXT COMMENT 'assistant调用tools的记录信息',
+    thinking LONGTEXT COMMENT '模型输出的深度思考内容',
     create_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     is_compaction TINYINT NOT NULL DEFAULT 1 COMMENT '压缩状态：0-被压缩，1-没有被压缩',
     INDEX idx_session_id (session_id),

@@ -9,7 +9,7 @@ import { CompactMessages } from '../compact';
  * 关联：被loop模块调用，在InvokeAgent循环中处理context
  * 预期结果：返回messages数组，包含历史对话记录
  */
-export function CombineContext(options: CombineContextOptions): any[] {
+export async function CombineContext(options: CombineContextOptions): Promise<any[]> {
     // 参数有效性检查
     if (!options.sessionId) {
         throw new Error('sessionId is required');
@@ -112,11 +112,18 @@ export function CombineContext(options: CombineContextOptions): any[] {
 
     // 如果需要压缩
     if (shouldCompress) {
+        // 检查messages中是否已经有压缩内容（第一条消息的content包含压缩标记）
+        const hasCompactedContent = messages.length > 0 && 
+            messages[0].role === 'user' && 
+            (messages[0].content?.includes('[压缩') || messages[0].content?.includes('[Compressed'));
+        
         // 调用CompactMessages进行压缩
-        const compactedMessages = CompactMessages({
+        const compactedMessages = await CompactMessages({
             messages: messages,
             contextTokens: contextTokens,
-            contextWindow: options.contextWindow
+            contextWindow: options.contextWindow,
+            ai: options.ai,
+            hasCompactedContent: hasCompactedContent
         });
         
         return compactedMessages;

@@ -1,12 +1,13 @@
 import { CompactOptions } from './types';
 import { EstimateTokens } from './estimateTokens';
+import { MessagesToSequence } from './messagesToSequence';
 
 /**
  * 作用：压缩上下文消息，保留最新的消息，压缩旧的消息
  * 关联：被combineContext调用，当token使用量超过阈值时触发
  * 预期结果：返回压缩后的messages数组
  */
-export function CompactMessages(options: CompactOptions): any[] {
+export async function CompactMessages(options: CompactOptions): Promise<any[]> {
     // 参数有效性检查
     if (!options.messages || options.messages.length === 0) {
         return [];
@@ -19,6 +20,9 @@ export function CompactMessages(options: CompactOptions): any[] {
     if (!options.contextWindow) {
         throw new Error('contextWindow is required');
     }
+
+    // 提取压缩LLM配置
+    const compactLLMConfig = ExtractCompactLLMConfig(options.ai);
 
     // 设置默认保留比例为40%
     const keepRatio = options.compactRatio ?? 0.4;
@@ -78,14 +82,115 @@ export function CompactMessages(options: CompactOptions): any[] {
         return options.messages;
     }
 
-    // TODO: 调用LLM进行压缩，提取关键信息
+    // 调用LLM进行压缩
+    const compressedSummary = await CallCompactLLM(
+        messagesToCompact,
+        compactLLMConfig,
+        options.hasCompactedContent || false
+    );
     
-    // 暂时返回一个占位的压缩摘要消息
+    // 创建压缩摘要消息（作为user消息）
     const compactedMessage = {
-        role: 'system',
-        content: `[压缩的上下文：包含${messagesToCompact.length}条消息，约${options.contextTokens - accumulatedTokens} tokens]`
+        role: 'user',
+        content: compressedSummary
     };
 
     // 返回压缩后的消息数组：压缩摘要 + 保留的最新消息
     return [compactedMessage, ...messagesToKeep];
+}
+
+
+/**
+ * 作用：调用LLM进行上下文压缩
+ * 关联：被CompactMessages调用
+ * 预期结果：返回压缩后的摘要文本
+ */
+async function CallCompactLLM(
+    messagesToCompact: any[],
+    compactLLMConfig: any,
+    hasCompactedContent: boolean
+): Promise<string> {
+    // 导入prompt
+    const { SUMMARIZATION_SYSTEM_PROMPT } = await import('./conpactPrompt/systemPrompt');
+    const { TURN_PREFIX_SUMMARIZATION_PROMPT } = await import('./conpactPrompt/conpactPrompt');
+    const { UPDATE_SUMMARIZATION_PROMPT } = await import('./conpactPrompt/updateCompactPrompt');
+    
+    // 将消息转换为序列文本
+    const messageSequence = MessagesToSequence(messagesToCompact);
+    
+    // 根据是否已有压缩内容选择不同的prompt
+    let userPrompt: string;
+    if (hasCompactedContent) {
+        // 如果已有压缩内容，使用更新prompt
+        // 第一条消息应该是之前的压缩摘要
+        const previousSummary = messagesToCompact[0]?.content || '';
+        userPrompt = `<previous-summary>\n${previousSummary}\n</previous-summary>\n\n${UPDATE_SUMMARIZATION_PROMPT}\n\n${messageSequence}`;
+    } else {
+        // 首次压缩，使用基础prompt
+        userPrompt = `${TURN_PREFIX_SUMMARIZATION_PROMPT}\n\n${messageSequence}`;
+    }
+    
+    // 构建压缩请求的messages
+    const compactMessages = [
+        {
+            role: 'system',
+            content: SUMMARIZATION_SYSTEM_PROMPT
+        },
+        {
+            role: 'user',
+            content: userPrompt
+        }
+    ];
+    
+    // 调用AI模块
+    const { InvokeModel } = await import('../../agentLoop/ai');
+    
+    const compactAIOptions = {
+        ...compactLLMConfig,
+        messages: compactMessages,
+        stream: false
+    };
+    
+    const response = await InvokeModel(compactAIOptions);
+    
+    // 提取压缩结果
+    // 根据不同的响应格式提取内容
+    let compressedContent = '';
+    if (typeof response === 'string') {
+        compressedContent = response;
+    } else if (response.choices && response.choices[0]) {
+        compressedContent = response.choices[0].message?.content || response.choices[0].text || '';
+    } else if (response.content) {
+        compressedContent = response.content;
+    } else {
+        throw new Error('Unable to extract compressed content from LLM response');
+    }
+    
+    return compressedContent;
+}
+
+/**
+ * 作用：从ai配置中提取压缩LLM的配置信息
+ * 关联：被CompactMessages调用
+ * 预期结果：返回压缩LLM的配置对象
+ */
+function ExtractCompactLLMConfig(ai: any): any {
+    if (!ai) {
+        throw new Error('AI configuration is required for compaction');
+    }
+
+    // 构建压缩LLM配置
+    const compactConfig: any = {
+        provider: ai.compact_llm_provider || ai.provider,
+        apiKey: ai.compact_llm_apiKey || ai.apiKey,
+        baseUrl: ai.compact_llm_baseUrl || ai.baseUrl,
+        model: ai.compact_llm_model || ai.model,
+        temperature: ai.compact_llm_temperature || ai.temperature || 0.3,
+        topP: ai.compact_llm_topP || ai.topP,
+        contextLength: ai.compact_llm_contextLength || ai.contextLength,
+        stream: false, // 压缩不需要流式响应
+        other: ai.compact_llm_other || ai.other
+    };
+
+    return compactConfig;
 }

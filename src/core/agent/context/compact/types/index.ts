@@ -14,4 +14,8 @@ export interface CompactOptions {
     contextWindow: number;
     // 压缩比例（默认0.6，即压缩前60%的内容）
     compactRatio?: number;
+    // AI配置参数（用于调用压缩LLM）
+    ai?: any;
+    // 是否已经有压缩内容（用于判断使用哪个prompt）
+    hasCompactedContent?: boolean;
 }

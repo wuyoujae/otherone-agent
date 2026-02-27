@@ -22,4 +22,6 @@ export interface CombineContextOptions {
     contextWindow: number;
     // 触发压缩的阈值百分比（默认0.8，即80%）
     thresholdPercentage?: number;
+    // AI配置参数（用于压缩LLM调用）
+    ai?: any;
 }

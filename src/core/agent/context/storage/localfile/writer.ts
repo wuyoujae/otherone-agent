@@ -17,35 +17,36 @@ export function WriteEntryToFile(options: {
 }): void {
     // 获取存储文件路径
     const storagePath = path.join(process.cwd(), '.veloca', 'storage', 'veloca-storage.json');
-    
+
     // 确保目录存在
     const storageDir = path.dirname(storagePath);
     if (!fs.existsSync(storageDir)) {
         fs.mkdirSync(storageDir, { recursive: true });
     }
-    
+
     // 读取现有数据
     let storageData: any = { sessions: [] };
     if (fs.existsSync(storagePath)) {
         const fileContent = fs.readFileSync(storagePath, 'utf-8');
         storageData = JSON.parse(fileContent);
     }
-    
+
     // 查找或创建session
     let session = storageData.sessions.find((s: any) => s.session_id === options.sessionId);
     if (!session) {
         session = {
             session_id: options.sessionId,
+            status: 0,
             create_at: new Date().toISOString(),
             entries: [],
             compacted_entries: []
         };
         storageData.sessions.push(session);
     }
-    
+
     // 在存储前生成UUID
     const entryId = uuidv4();
-    
+
     // 创建新的entry
     const newEntry: any = {
         entry_id: entryId,
@@ -53,23 +54,24 @@ export function WriteEntryToFile(options: {
         content: options.content,
         create_at: options.createAt || new Date().toISOString()
     };
-    
+
     // 如果有tools信息，添加tools字段
     if (options.tools) {
         newEntry.tools = options.tools;
     }
-    
+
     // 如果有token_consumption，添加该字段
     if (options.tokenConsumption !== undefined) {
         newEntry.token_consumption = options.tokenConsumption;
     }
-    
+
     // 添加到entries数组
     session.entries.push(newEntry);
-    
+
     // 写回文件
     fs.writeFileSync(storagePath, JSON.stringify(storageData, null, 2), 'utf-8');
 }
+
 
 /**
  * 作用：将压缩记录写入本地JSON文件

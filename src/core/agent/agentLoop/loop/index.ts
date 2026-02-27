@@ -10,7 +10,23 @@ import { WriteEntry } from '../../context/storage';
  * 预期结果：根据input和ai配置，执行完整的Agent循环，返回最终响应
  */
 export async function InvokeAgent(input: InputOptions, ai: AIOptions): Promise<any> {
-    // TODO: 实现Agent调用逻辑
+    // 保存用户首次传入的messages（如果有）
+    const initialMessages = ai.messages && ai.messages.length > 0 ? [...ai.messages] : null;
+    
+    // 如果是首次调用且有初始消息，先存储用户消息
+    if (initialMessages) {
+        for (const msg of initialMessages) {
+            if (msg.role === 'user') {
+                WriteEntry({
+                    storageType: input.storageType || 'localfile',
+                    sessionId: input.sessionId,
+                    role: 'user',
+                    content: msg.content
+                });
+            }
+        }
+    }
+    
     while(true){
         // 组合tools配置
         CombineTools(ai);
@@ -54,7 +70,32 @@ export async function InvokeAgent(input: InputOptions, ai: AIOptions): Promise<a
                 console.log('检测到Tool调用，数量:', parsedResponse.tools.tool_calls.length);
                 const toolResults = await ProcessTools(parsedResponse.tools.tool_calls, ai.tools_realize || {});
                 console.log('Tool调用结果:', toolResults);
-                // TODO: 将tool结果发送回AI继续对话
+                
+                // 遍历每个tool结果，分别存储
+                for (const toolResult of toolResults) {
+                    // 将单个tool结果转换为content字符串
+                    const toolResultContent = JSON.stringify(toolResult.result || toolResult.error);
+                    
+                    // 存储单个tool结果（role为'tool'）
+                    WriteEntry({
+                        storageType: input.storageType || 'localfile',
+                        sessionId: input.sessionId,
+                        role: 'tool',
+                        content: toolResultContent,
+                        tools: {
+                            tool_call_id: toolResult.tool_call_id,
+                            function_name: toolResult.function_name,
+                            result: toolResult.result,
+                            error: toolResult.error
+                        }
+                    });
+                    
+                    console.log(`Tool ${toolResult.function_name} 结果已存储`);
+                }
+                
+                console.log('所有Tool结果已存储，继续循环...\n');
+                // 继续while循环，不要return
+                continue;
             }
             
             return parsedResponse;
@@ -78,7 +119,32 @@ export async function InvokeAgent(input: InputOptions, ai: AIOptions): Promise<a
                 console.log('检测到Tool调用，数量:', parsedResponse.tools.tool_calls.length);
                 const toolResults = await ProcessTools(parsedResponse.tools.tool_calls, ai.tools_realize || {});
                 console.log('Tool调用结果:', toolResults);
-                // TODO: 将tool结果发送回AI继续对话
+                
+                // 遍历每个tool结果，分别存储
+                for (const toolResult of toolResults) {
+                    // 将单个tool结果转换为content字符串
+                    const toolResultContent = JSON.stringify(toolResult.result || toolResult.error);
+                    
+                    // 存储单个tool结果（role为'tool'）
+                    WriteEntry({
+                        storageType: input.storageType || 'localfile',
+                        sessionId: input.sessionId,
+                        role: 'tool',
+                        content: toolResultContent,
+                        tools: {
+                            tool_call_id: toolResult.tool_call_id,
+                            function_name: toolResult.function_name,
+                            result: toolResult.result,
+                            error: toolResult.error
+                        }
+                    });
+                    
+                    console.log(`Tool ${toolResult.function_name} 结果已存储`);
+                }
+                
+                console.log('所有Tool结果已存储，继续循环...\n');
+                // 继续while循环，不要return
+                continue;
             }
             
             return parsedResponse;

@@ -346,9 +346,13 @@ function TransformToOpenAIFormat(sessionData: any, compactedSummary: string | nu
         
         // 如果是tool角色，需要特殊处理
         if (entry.role === 'tool') {
-            // tool消息需要tool_call_id
+            // tool消息需要tool_call_id和name字段
             if (entry.tools && entry.tools.tool_call_id) {
                 message.tool_call_id = entry.tools.tool_call_id;
+            }
+            // 添加name字段（函数名称）
+            if (entry.tools && entry.tools.function_name) {
+                message.name = entry.tools.function_name;
             }
         }
         

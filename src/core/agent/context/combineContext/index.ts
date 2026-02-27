@@ -2,6 +2,7 @@ import { CombineContextOptions } from './types';
 import { ReadSessionData } from '../storage/localfile/reader';
 import { CheckThreshold } from '../compact/checkThreshold';
 import { EstimateTokens } from '../compact/estimateTokens';
+import { CompactMessages } from '../compact';
 
 /**
  * 作用：组合context配置，根据session_id加载历史消息
@@ -34,7 +35,7 @@ export function CombineContext(options: CombineContextOptions): any[] {
             sessionData = {
                 session: {},
                 entries: [],
-                compacted_dialogues: []
+                compacted_entries: []
             };
             break;
         case 'localfile':
@@ -44,8 +45,17 @@ export function CombineContext(options: CombineContextOptions): any[] {
             throw new Error(`Unsupported loadType: ${options.loadType}`);
     }
 
+    // 处理压缩记录，找到最新的压缩内容和起始entry_id
+    const { latestCompactedSummary, startEntryId } = ProcessCompactedEntries(sessionData);
+
+    // 根据startEntryId过滤entries
+    const filteredEntries = FilterEntriesFromStart(sessionData.entries, startEntryId);
+
+    // 更新sessionData的entries为过滤后的结果
+    sessionData.entries = filteredEntries;
+
     // 根据provider类型转换数据格式
-    const messages = TransformToMessages(sessionData, options.provider);
+    const messages = TransformToMessages(sessionData, options.provider, latestCompactedSummary);
 
     // 获取最后一条assistant消息的token_consumption
     // 如果没有找到，继续往前找，最多找3次
@@ -102,9 +112,14 @@ export function CombineContext(options: CombineContextOptions): any[] {
 
     // 如果需要压缩
     if (shouldCompress) {
-        // TODO: 实现压缩逻辑
-        // 暂时直接返回messages
-        return messages;
+        // 调用CompactMessages进行压缩
+        const compactedMessages = CompactMessages({
+            messages: messages,
+            contextTokens: contextTokens,
+            contextWindow: options.contextWindow
+        });
+        
+        return compactedMessages;
     }
 
     // 不需要压缩，直接返回messages
@@ -112,19 +127,125 @@ export function CombineContext(options: CombineContextOptions): any[] {
 }
 
 /**
+ * 作用：处理压缩记录，找到最新的压缩内容和起始entry_id
+ * 关联：被CombineContext调用
+ * 预期结果：返回最新的压缩摘要和起始entry_id
+ */
+function ProcessCompactedEntries(sessionData: any): { latestCompactedSummary: string | null, startEntryId: string | null } {
+    // 如果没有压缩记录，返回null
+    if (!sessionData.compacted_entries || sessionData.compacted_entries.length === 0) {
+        return { latestCompactedSummary: null, startEntryId: null };
+    }
+
+    // 按create_at降序排序，取最新的压缩记录
+    const sortedCompacted = [...sessionData.compacted_entries].sort((a, b) => {
+        return new Date(b.create_at).getTime() - new Date(a.create_at).getTime();
+    });
+
+    const latestCompacted = sortedCompacted[0];
+    
+    // 如果summary为空，返回null
+    if (!latestCompacted.summary) {
+        return { latestCompactedSummary: null, startEntryId: null };
+    }
+
+    // 递归查找最终的trigger_entry_id
+    const finalEntryId = FindFinalTriggerEntryId(
+        latestCompacted.trigger_entry_id,
+        sessionData.compacted_entries,
+        sessionData.entries
+    );
+
+    return {
+        latestCompactedSummary: latestCompacted.summary,
+        startEntryId: finalEntryId
+    };
+}
+
+/**
+ * 作用：递归查找最终的trigger_entry_id，直到找到在entries表中的entry_id
+ * 关联：被ProcessCompactedEntries调用
+ * 预期结果：返回在entries表中的entry_id
+ */
+function FindFinalTriggerEntryId(
+    triggerId: string,
+    compactedEntries: any[],
+    entries: any[]
+): string | null {
+    // 防止循环引用，最多递归10次
+    const maxDepth = 10;
+    let currentId = triggerId;
+    const visitedIds = new Set<string>();
+
+    for (let i = 0; i < maxDepth; i++) {
+        // 检查是否已经访问过这个ID（防止循环引用）
+        if (visitedIds.has(currentId)) {
+            console.warn(`检测到循环引用: ${currentId}`);
+            return null;
+        }
+        visitedIds.add(currentId);
+
+        // 先检查是否在entries中
+        const entryExists = entries.some((e: any) => e.entry_id === currentId);
+        if (entryExists) {
+            return currentId;
+        }
+
+        // 如果不在entries中，检查是否在compacted_entries中
+        const compactedEntry = compactedEntries.find((c: any) => c.entry_id === currentId);
+        if (compactedEntry) {
+            // 继续查找这个压缩记录的trigger_entry_id
+            currentId = compactedEntry.trigger_entry_id;
+        } else {
+            // 既不在entries也不在compacted_entries中，数据不一致
+            console.warn(`trigger_entry_id不存在: ${currentId}`);
+            return null;
+        }
+    }
+
+    // 超过最大递归深度
+    console.warn(`超过最大递归深度，最后的ID: ${currentId}`);
+    return null;
+}
+
+/**
+ * 作用：从startEntryId开始过滤entries
+ * 关联：被CombineContext调用
+ * 预期结果：返回从startEntryId开始往后的所有entries
+ */
+function FilterEntriesFromStart(entries: any[], startEntryId: string | null): any[] {
+    // 如果没有startEntryId，返回所有entries
+    if (!startEntryId) {
+        return entries;
+    }
+
+    // 找到startEntryId在entries中的索引
+    const startIndex = entries.findIndex((e: any) => e.entry_id === startEntryId);
+
+    // 如果没找到，返回所有entries
+    if (startIndex === -1) {
+        console.warn(`startEntryId不存在于entries中: ${startEntryId}`);
+        return entries;
+    }
+
+    // 返回从startIndex开始往后的所有entries
+    return entries.slice(startIndex);
+}
+
+/**
  * 作用：将session数据转换为AI请求的messages格式
  * 关联：被CombineContext调用
  * 预期结果：返回符合不同provider要求的messages数组
  */
-function TransformToMessages(sessionData: any, provider: string): any[] {
+function TransformToMessages(sessionData: any, provider: string, compactedSummary: string | null): any[] {
     // 根据provider类型进行不同的转换
     switch (provider) {
         case 'openai':
-            return TransformToOpenAIFormat(sessionData);
+            return TransformToOpenAIFormat(sessionData, compactedSummary);
         case 'anthropic':
-            return TransformToAnthropicFormat(sessionData);
+            return TransformToAnthropicFormat(sessionData, compactedSummary);
         case 'fetch':
-            return TransformToFetchFormat(sessionData);
+            return TransformToFetchFormat(sessionData, compactedSummary);
         default:
             throw new Error(`Unsupported provider: ${provider}`);
     }
@@ -135,20 +256,24 @@ function TransformToMessages(sessionData: any, provider: string): any[] {
  * 关联：被TransformToMessages调用
  * 预期结果：返回OpenAI格式的messages数组
  */
-function TransformToOpenAIFormat(sessionData: any): any[] {
+function TransformToOpenAIFormat(sessionData: any, compactedSummary: string | null): any[] {
     const messages: any[] = [];
+    
+    // 如果有压缩摘要，作为第一条user消息添加
+    if (compactedSummary) {
+        messages.push({
+            role: 'user',
+            content: compactedSummary
+        });
+    }
     
     // 检查是否有entries
     if (!sessionData.entries || sessionData.entries.length === 0) {
         return messages;
     }
     
-    // 按照栈的方式处理：越早的消息越在数组末尾
-    // 先将entries反转，使得最早的消息在最前面
-    const sortedEntries = [...sessionData.entries].reverse();
-    
-    // 遍历所有entries，转换为OpenAI格式
-    for (const entry of sortedEntries) {
+    // entries已经是按时间顺序排列的（从早到晚），直接遍历即可
+    for (const entry of sessionData.entries) {
         const message: any = {
             role: entry.role,
             content: entry.content
@@ -182,7 +307,7 @@ function TransformToOpenAIFormat(sessionData: any): any[] {
  * 关联：被TransformToMessages调用
  * 预期结果：返回Anthropic格式的messages数组
  */
-function TransformToAnthropicFormat(sessionData: any): any[] {
+function TransformToAnthropicFormat(sessionData: any, compactedSummary: string | null): any[] {
     // TODO: 实现Anthropic格式转换
     return [];
 }
@@ -192,7 +317,7 @@ function TransformToAnthropicFormat(sessionData: any): any[] {
  * 关联：被TransformToMessages调用
  * 预期结果：返回Fetch格式的messages数组
  */
-function TransformToFetchFormat(sessionData: any): any[] {
+function TransformToFetchFormat(sessionData: any, compactedSummary: string | null): any[] {
     // TODO: 实现Fetch格式转换
     return [];
 }

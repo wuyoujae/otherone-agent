@@ -44,9 +44,10 @@
       "is_compaction": 1
     }
   ],
-  "compacted_dialogues": [
+  "compacted_entries": [
     {
       "entry_id": "uuid-example-1",
+      "session_id": "uuid-example-1",
       "trigger_entry_id": "uuid-example-10",
       "summary": "这是一段压缩后的对话摘要内容",
       "create_at": "2024-01-01T00:10:00.000Z",

@@ -1,0 +1,17 @@
+/**
+ * 作用：定义compact模块的类型
+ * 关联：被compact/index.ts使用
+ * 预期结果：提供清晰的类型定义
+ */
+
+// Compact参数类型
+export interface CompactOptions {
+    // 需要压缩的messages数组
+    messages: any[];
+    // 当前已使用的token数量
+    contextTokens: number;
+    // 模型的上下文窗口大小
+    contextWindow: number;
+    // 压缩比例（默认0.6，即压缩前60%的内容）
+    compactRatio?: number;
+}

@@ -22,7 +22,7 @@ export function ReadStorageFile(): any {
         const initialData = {
             sessions: [],
             entries: [],
-            compacted_dialogues: []
+            compacted_entries: []
         };
         
         fs.writeFileSync(storagePath, JSON.stringify(initialData, null, 2), 'utf-8');
@@ -40,7 +40,7 @@ export function ReadStorageFile(): any {
 
 /**
  * 作用：根据session_id读取该会话的所有数据
- * 关联：被localfile/index.ts调用，读取指定会话的session、entries和compacted_dialogues
+ * 关联：被localfile/index.ts调用，读取指定会话的session、entries和compacted_entries
  * 预期结果：返回包含该会话所有相关数据的对象
  */
 export function ReadSessionData(sessionId: string): any {
@@ -64,17 +64,15 @@ export function ReadSessionData(sessionId: string): any {
         e.session_id === sessionId && e.status === 0
     );
     
-    // 筛选该session相关的压缩对话（只返回status为0的）
-    const compactedDialogues = allData.compacted_dialogues.filter((c: any) => {
-        // 找到trigger_entry_id对应的entry，检查是否属于该session
-        const triggerEntry = allData.entries.find((e: any) => e.entry_id === c.trigger_entry_id);
-        return triggerEntry && triggerEntry.session_id === sessionId && c.status === 0;
-    });
+    // 筛选该session的压缩记录（只返回status为0的，直接通过session_id筛选）
+    const compactedEntries = (allData.compacted_entries || []).filter((c: any) => 
+        c.session_id === sessionId && c.status === 0
+    );
     
     return {
         session,
         entries,
-        compacted_dialogues: compactedDialogues
+        compacted_entries: compactedEntries
     };
 }
 

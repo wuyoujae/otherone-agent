@@ -190,13 +190,13 @@ async function CallCompactLLM(
     
     switch (compactLLMConfig.provider) {
         case 'openai':
-            compressedContent = HandleOpenAIResponse(response);
+            compressedContent = await HandleOpenAIResponse(response);
             break;
         case 'anthropic':
-            compressedContent = HandleAnthropicResponse(response);
+            compressedContent = await HandleAnthropicResponse(response);
             break;
         case 'fetch':
-            compressedContent = HandleFetchResponse(response);
+            compressedContent = await HandleFetchResponse(response);
             break;
         default:
             throw new Error(`Unsupported provider type: ${compactLLMConfig.provider}`);
@@ -232,12 +232,28 @@ function ExtractCompactLLMConfig(ai: any): any {
 }
 
 /**
- * 作用：处理OpenAI的响应格式
+ * 作用：处理OpenAI的响应格式（支持流式和非流式）
  * 关联：被CallCompactLLM调用
  * 预期结果：返回提取的压缩内容文本
  */
-function HandleOpenAIResponse(response: any): string {
-    // OpenAI响应格式：response.choices[0].message.content
+async function HandleOpenAIResponse(response: any): Promise<string> {
+    // 检查是否是流式响应
+    if (response && typeof response[Symbol.asyncIterator] === 'function') {
+        // 处理流式响应
+        return await HandleOpenAIStreamResponse(response);
+    } else {
+        // 处理非流式响应
+        return HandleOpenAINonStreamResponse(response);
+    }
+}
+
+/**
+ * 作用：处理OpenAI的非流式响应
+ * 关联：被HandleOpenAIResponse调用
+ * 预期结果：返回提取的压缩内容文本
+ */
+function HandleOpenAINonStreamResponse(response: any): string {
+    // OpenAI非流式响应格式：response.choices[0].message.content
     if (!response.choices || !response.choices[0]) {
         throw new Error('Invalid OpenAI response format: missing choices');
     }
@@ -252,11 +268,44 @@ function HandleOpenAIResponse(response: any): string {
 }
 
 /**
+ * 作用：处理OpenAI的流式响应
+ * 关联：被HandleOpenAIResponse调用
+ * 预期结果：返回完整的压缩内容文本
+ */
+async function HandleOpenAIStreamResponse(stream: any): Promise<string> {
+    let fullContent = '';
+    
+    try {
+        for await (const chunk of stream) {
+            const delta = chunk.choices?.[0]?.delta;
+            
+            if (!delta) {
+                continue;
+            }
+            
+            // 累积content
+            if (delta.content) {
+                fullContent += delta.content;
+            }
+        }
+        
+        if (!fullContent) {
+            throw new Error('Unable to extract content from OpenAI stream response');
+        }
+        
+        return fullContent;
+        
+    } catch (error: any) {
+        throw new Error(`Failed to process OpenAI stream response: ${error.message}`);
+    }
+}
+
+/**
  * 作用：处理Anthropic的响应格式
  * 关联：被CallCompactLLM调用
  * 预期结果：返回提取的压缩内容文本
  */
-function HandleAnthropicResponse(response: any): string {
+async function HandleAnthropicResponse(response: any): Promise<string> {
     // TODO: 实现Anthropic响应处理
     throw new Error('Anthropic response handling not implemented yet');
 }
@@ -266,7 +315,7 @@ function HandleAnthropicResponse(response: any): string {
  * 关联：被CallCompactLLM调用
  * 预期结果：返回提取的压缩内容文本
  */
-function HandleFetchResponse(response: any): string {
+async function HandleFetchResponse(response: any): Promise<string> {
     // TODO: 实现Fetch响应处理
     throw new Error('Fetch response handling not implemented yet');
 }

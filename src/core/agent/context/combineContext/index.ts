@@ -57,11 +57,22 @@ export async function CombineContext(options: CombineContextOptions): Promise<an
     // 根据provider类型转换数据格式
     const messages = TransformToMessages(sessionData, options.provider, latestCompactedSummary);
 
-    // 单独计算system prompt的token（不添加到messages中）
+    // 单独计算system prompt和tools的token（不添加到messages中）
+    // 注意：只有在没有token_consumption时才需要这些token
     let systemPromptTokens = 0;
     if (options.systemPrompt) {
         systemPromptTokens = EstimateTokens({
             messages: [{ role: 'system', content: options.systemPrompt }]
+        });
+    }
+
+    let toolsTokens = 0;
+    if (options.tools && options.tools.length > 0) {
+        // 估算tools定义的token消耗
+        // 将tools数组转换为JSON字符串来估算token
+        const toolsJson = JSON.stringify(options.tools);
+        toolsTokens = EstimateTokens({
+            messages: [{ role: 'system', content: toolsJson }]
         });
     }
 
@@ -92,6 +103,15 @@ export async function CombineContext(options: CombineContextOptions): Promise<an
         if (contextTokens === 0) {
             // 没找到token_consumption，估算所有messages
             messagesToEstimate = messages;
+            
+            // 估算messages的token
+            const estimatedTokens = EstimateTokens({
+                messages: messagesToEstimate,
+                lastTokenIndex: foundTokenIndex >= 0 ? foundTokenIndex : undefined
+            });
+            
+            // 没有token_consumption时，需要加上system prompt和tools的token
+            contextTokens = estimatedTokens + systemPromptTokens + toolsTokens;
         } else {
             // 找到了token_consumption，只估算foundTokenIndex之后的messages
             // 因为entries是反转的，所以需要计算正确的起始位置
@@ -99,20 +119,20 @@ export async function CombineContext(options: CombineContextOptions): Promise<an
             const messagesToEstimateCount = sessionData.entries.length - startIndex;
             // messages数组是反转后的，所以从前面取messagesToEstimateCount个
             messagesToEstimate = messages.slice(0, messagesToEstimateCount);
+            
+            // 估算新增messages的token
+            const estimatedTokens = EstimateTokens({
+                messages: messagesToEstimate,
+                lastTokenIndex: foundTokenIndex >= 0 ? foundTokenIndex : undefined
+            });
+            
+            // 有token_consumption时，只加上新增messages的估算值
+            // 因为token_consumption已经包含了system prompt和tools
+            contextTokens = contextTokens + estimatedTokens;
         }
-        
-        const estimatedTokens = EstimateTokens({
-            messages: messagesToEstimate,
-            lastTokenIndex: foundTokenIndex >= 0 ? foundTokenIndex : undefined
-        });
-        
-        // 如果找到了token_consumption，则在其基础上加上估算值
-        // 如果没找到，则直接使用估算值
-        contextTokens = contextTokens + estimatedTokens;
     }
-    
-    // 将system prompt的token加到总token中
-    contextTokens = contextTokens + systemPromptTokens;
+    // 如果找到了token_consumption且最后一条就是assistant，直接使用
+    // 不需要加上system prompt和tools，因为token_consumption已经包含了
 
     // 检查是否需要压缩
     const shouldCompress = CheckThreshold({

@@ -26,4 +26,6 @@ export interface CombineContextOptions {
     ai?: any;
     // 系统提示词
     systemPrompt?: string;
+    // 工具定义数组
+    tools?: any[];
 }

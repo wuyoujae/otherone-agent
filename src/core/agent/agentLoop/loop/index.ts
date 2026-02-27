@@ -1,5 +1,5 @@
 import { InputOptions, AIOptions } from './types';
-import { CombineTools } from '../../tools';
+import { CombineTools, ProcessTools } from '../../tools';
 import { CombineContext } from '../../context/combineContext';
 import { InvokeModel } from '../ai';
 import { WriteEntry } from '../../context/storage';
@@ -48,6 +48,15 @@ export async function InvokeAgent(input: InputOptions, ai: AIOptions): Promise<a
                 tokenConsumption: parsedResponse.token_consumption
             });
             
+            // 检查是否有tool调用
+            if (parsedResponse.tools && parsedResponse.tools.tool_calls && parsedResponse.tools.tool_calls.length > 0) {
+                // 处理tool调用
+                console.log('检测到Tool调用，数量:', parsedResponse.tools.tool_calls.length);
+                const toolResults = ProcessTools(parsedResponse.tools.tool_calls);
+                console.log('Tool调用结果:', toolResults);
+                // TODO: 将tool结果发送回AI继续对话
+            }
+            
             return parsedResponse;
         } else {
             // 处理非流式响应
@@ -62,6 +71,15 @@ export async function InvokeAgent(input: InputOptions, ai: AIOptions): Promise<a
                 tools: parsedResponse.tools,
                 tokenConsumption: parsedResponse.token_consumption
             });
+            
+            // 检查是否有tool调用
+            if (parsedResponse.tools && parsedResponse.tools.tool_calls && parsedResponse.tools.tool_calls.length > 0) {
+                // 处理tool调用
+                console.log('检测到Tool调用，数量:', parsedResponse.tools.tool_calls.length);
+                const toolResults = ProcessTools(parsedResponse.tools.tool_calls);
+                console.log('Tool调用结果:', toolResults);
+                // TODO: 将tool结果发送回AI继续对话
+            }
             
             return parsedResponse;
         }

@@ -1,18 +1,32 @@
 import { ToolsOptions } from './types';
 
 /**
- * 作用：处理工具调用配置
- * 关联：被agentLoop模块调用，将用户传入的tools数组传递给AI模块
- * 预期结果：返回处理后的tools配置，供AI模块使用
+ * 作用：处理AI返回的tool调用
+ * 关联：被loop模块调用，处理AI请求的tool_calls
+ * 预期结果：执行tool调用并返回结果
  */
-export function ProcessTools(tools: ToolsOptions): any[] {
+export function ProcessTools(tool_calls: any[]): any {
     // 参数有效性检查
-    if (!tools.tools || !Array.isArray(tools.tools)) {
-        throw new Error('tools must be an array');
+    if (!tool_calls || !Array.isArray(tool_calls)) {
+        throw new Error('tool_calls must be an array');
     }
 
-    // 直接返回tools数组
-    return tools.tools;
+    if (tool_calls.length === 0) {
+        throw new Error('tool_calls array is empty');
+    }
+
+    // TODO: 实现tool调用逻辑
+    console.log('ProcessTools: 收到tool_calls数量:', tool_calls.length);
+    
+    // 遍历每个tool call
+    for (const toolCall of tool_calls) {
+        console.log('Tool Call ID:', toolCall.id);
+        console.log('Tool Name:', toolCall.function?.name);
+        console.log('Tool Arguments:', toolCall.function?.arguments);
+    }
+    
+    // 暂时返回空结果
+    return {};
 }
 
 /**

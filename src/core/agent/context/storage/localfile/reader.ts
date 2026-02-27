@@ -41,7 +41,7 @@ export function ReadStorageFile(): any {
 /**
  * 作用：根据session_id读取该会话的所有数据
  * 关联：被localfile/index.ts调用，读取指定会话的session、entries和compacted_entries
- * 预期结果：返回包含该会话所有相关数据的对象
+ * 预期结果：返回包含该会话所有相关数据的对象，如果session不存在则返回空数据结构
  */
 export function ReadSessionData(sessionId: string): any {
     // 参数检查
@@ -55,8 +55,13 @@ export function ReadSessionData(sessionId: string): any {
     // 查找指定的session
     const session = allData.sessions.find((s: any) => s.session_id === sessionId && s.status === 0);
     
+    // 如果session不存在，返回空数据结构（首次调用的情况）
     if (!session) {
-        throw new Error(`Session not found: ${sessionId}`);
+        return {
+            session: null,
+            entries: [],
+            compacted_entries: []
+        };
     }
     
     // 筛选该session的所有entries（只返回status为0的）

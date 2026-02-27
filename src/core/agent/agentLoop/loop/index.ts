@@ -52,7 +52,7 @@ export async function InvokeAgent(input: InputOptions, ai: AIOptions): Promise<a
             if (parsedResponse.tools && parsedResponse.tools.tool_calls && parsedResponse.tools.tool_calls.length > 0) {
                 // 处理tool调用
                 console.log('检测到Tool调用，数量:', parsedResponse.tools.tool_calls.length);
-                const toolResults = ProcessTools(parsedResponse.tools.tool_calls);
+                const toolResults = await ProcessTools(parsedResponse.tools.tool_calls, ai.tools_realize || {});
                 console.log('Tool调用结果:', toolResults);
                 // TODO: 将tool结果发送回AI继续对话
             }
@@ -76,7 +76,7 @@ export async function InvokeAgent(input: InputOptions, ai: AIOptions): Promise<a
             if (parsedResponse.tools && parsedResponse.tools.tool_calls && parsedResponse.tools.tool_calls.length > 0) {
                 // 处理tool调用
                 console.log('检测到Tool调用，数量:', parsedResponse.tools.tool_calls.length);
-                const toolResults = ProcessTools(parsedResponse.tools.tool_calls);
+                const toolResults = await ProcessTools(parsedResponse.tools.tool_calls, ai.tools_realize || {});
                 console.log('Tool调用结果:', toolResults);
                 // TODO: 将tool结果发送回AI继续对话
             }

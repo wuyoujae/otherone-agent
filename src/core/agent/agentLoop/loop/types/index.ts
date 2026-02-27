@@ -49,6 +49,8 @@ export interface AIOptions {
     topP?: number;
     // 工具定义数组
     tools?: any[];
+    // 工具实现函数映射
+    tools_realize?: Record<string, Function>;
     // 控制工具调用行为
     toolChoice?: 'none' | 'auto' | 'required' | { type: 'function'; function: { name: string } };
     // 是否启用并行工具调用

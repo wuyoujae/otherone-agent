@@ -3,9 +3,9 @@ import { ToolsOptions } from './types';
 /**
  * 作用：处理AI返回的tool调用
  * 关联：被loop模块调用，处理AI请求的tool_calls
- * 预期结果：执行tool调用并返回结果
+ * 预期结果：执行tool调用并返回结果数组
  */
-export function ProcessTools(tool_calls: any[]): any {
+export async function ProcessTools(tool_calls: any[], tools_realize: Record<string, Function>): Promise<any[]> {
     // 参数有效性检查
     if (!tool_calls || !Array.isArray(tool_calls)) {
         throw new Error('tool_calls must be an array');
@@ -15,18 +15,78 @@ export function ProcessTools(tool_calls: any[]): any {
         throw new Error('tool_calls array is empty');
     }
 
-    // TODO: 实现tool调用逻辑
-    console.log('ProcessTools: 收到tool_calls数量:', tool_calls.length);
-    
+    if (!tools_realize || typeof tools_realize !== 'object') {
+        throw new Error('tools_realize must be an object');
+    }
+
+    // 存储所有tool调用的结果
+    const results: any[] = [];
+
     // 遍历每个tool call
     for (const toolCall of tool_calls) {
-        console.log('Tool Call ID:', toolCall.id);
-        console.log('Tool Name:', toolCall.function?.name);
-        console.log('Tool Arguments:', toolCall.function?.arguments);
+        const toolCallId = toolCall.id;
+        const functionName = toolCall.function?.name;
+        const argumentsStr = toolCall.function?.arguments;
+
+        // 验证tool call格式
+        if (!toolCallId) {
+            throw new Error('tool_call missing id');
+        }
+
+        if (!functionName) {
+            throw new Error(`tool_call ${toolCallId} missing function name`);
+        }
+
+        // 查找对应的函数实现
+        const functionImpl = tools_realize[functionName];
+
+        if (!functionImpl) {
+            throw new Error(`Function '${functionName}' not found in tools_realize`);
+        }
+
+        if (typeof functionImpl !== 'function') {
+            throw new Error(`tools_realize['${functionName}'] is not a function`);
+        }
+
+        // 解析arguments（JSON字符串）
+        let args: any = {};
+        if (argumentsStr) {
+            try {
+                args = JSON.parse(argumentsStr);
+            } catch (error: any) {
+                throw new Error(`Failed to parse arguments for '${functionName}': ${error.message}`);
+            }
+        }
+
+        // 调用函数
+        try {
+            console.log(`调用Tool: ${functionName}, 参数:`, args);
+            
+            // 调用函数（支持同步和异步函数）
+            const result = await functionImpl(args);
+            
+            console.log(`Tool ${functionName} 执行成功，结果:`, result);
+
+            // 将结果添加到结果数组
+            results.push({
+                tool_call_id: toolCallId,
+                function_name: functionName,
+                result: result
+            });
+
+        } catch (error: any) {
+            console.error(`Tool ${functionName} 执行失败:`, error.message);
+            
+            // 即使失败也要记录结果
+            results.push({
+                tool_call_id: toolCallId,
+                function_name: functionName,
+                error: error.message
+            });
+        }
     }
-    
-    // 暂时返回空结果
-    return {};
+
+    return results;
 }
 
 /**

@@ -57,6 +57,14 @@ export async function CombineContext(options: CombineContextOptions): Promise<an
     // 根据provider类型转换数据格式
     const messages = TransformToMessages(sessionData, options.provider, latestCompactedSummary);
 
+    // 单独计算system prompt的token（不添加到messages中）
+    let systemPromptTokens = 0;
+    if (options.systemPrompt) {
+        systemPromptTokens = EstimateTokens({
+            messages: [{ role: 'system', content: options.systemPrompt }]
+        });
+    }
+
     // 获取最后一条assistant消息的token_consumption
     // 如果没有找到，继续往前找，最多找3次
     let contextTokens = 0;
@@ -102,6 +110,9 @@ export async function CombineContext(options: CombineContextOptions): Promise<an
         // 如果没找到，则直接使用估算值
         contextTokens = contextTokens + estimatedTokens;
     }
+    
+    // 将system prompt的token加到总token中
+    contextTokens = contextTokens + systemPromptTokens;
 
     // 检查是否需要压缩
     const shouldCompress = CheckThreshold({
@@ -129,10 +140,25 @@ export async function CombineContext(options: CombineContextOptions): Promise<an
             originalEntries: sessionData.entries
         });
         
+        // 在返回前添加system prompt到最前面
+        if (options.systemPrompt) {
+            compactedMessages.unshift({
+                role: 'system',
+                content: options.systemPrompt
+            });
+        }
+        
         return compactedMessages;
     }
 
-    // 不需要压缩，直接返回messages
+    // 不需要压缩，在返回前添加system prompt到最前面
+    if (options.systemPrompt) {
+        messages.unshift({
+            role: 'system',
+            content: options.systemPrompt
+        });
+    }
+    
     return messages;
 }
 

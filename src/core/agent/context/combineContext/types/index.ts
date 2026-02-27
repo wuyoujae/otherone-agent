@@ -24,4 +24,6 @@ export interface CombineContextOptions {
     thresholdPercentage?: number;
     // AI配置参数（用于压缩LLM调用）
     ai?: any;
+    // 系统提示词
+    systemPrompt?: string;
 }

@@ -32,6 +32,8 @@ export interface AIOptions {
     baseUrl: string;
     // 模型名称
     model: string;
+    // 系统提示词
+    systemPrompt?: string;
     // 消息列表
     messages?: any[];
     // 上下文长度限制

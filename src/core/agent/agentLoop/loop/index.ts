@@ -21,13 +21,14 @@ export async function InvokeAgent(input: InputOptions, ai: AIOptions): Promise<a
             provider: ai.provider,
             contextWindow: input.contextWindow,
             thresholdPercentage: input.thresholdPercentage,
-            ai: ai
+            ai: ai,
+            systemPrompt: ai.systemPrompt
         });
         
         // 将历史消息添加到ai配置中
         ai.messages = messages;
         
-        //TODO：将system prompt添加到ai的messages中
+        
 
         // 调用AI模型
         const response = await InvokeModel(ai);

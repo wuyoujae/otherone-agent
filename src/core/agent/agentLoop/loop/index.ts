@@ -15,8 +15,10 @@ export async function InvokeAgent(input: InputOptions, ai: AIOptions): Promise<a
     
     // 如果是首次调用且有初始消息，先存储用户消息
     if (initialMessages) {
+        console.log('[InvokeAgent] 存储初始用户消息...');
         for (const msg of initialMessages) {
             if (msg.role === 'user') {
+                console.log(`[InvokeAgent] 存储user消息: ${msg.content.substring(0, 50)}...`);
                 WriteEntry({
                     storageType: input.storageType || 'localfile',
                     sessionId: input.sessionId,
@@ -25,9 +27,17 @@ export async function InvokeAgent(input: InputOptions, ai: AIOptions): Promise<a
                 });
             }
         }
+        console.log('[InvokeAgent] 用户消息存储完成\n');
     }
     
-    while(true){
+    // 添加循环次数限制，防止无限循环
+    const maxIterations = 10;
+    let iteration = 0;
+    
+    while(iteration < maxIterations){
+        iteration++;
+        console.log(`\n=== 循环第 ${iteration} 次 ===\n`);
+        
         // 组合tools配置
         CombineTools(ai);
         
@@ -150,6 +160,9 @@ export async function InvokeAgent(input: InputOptions, ai: AIOptions): Promise<a
             return parsedResponse;
         }
     }
+    
+    // 如果循环次数超限，抛出错误
+    throw new Error(`Agent循环次数超过限制(${maxIterations}次)，可能陷入无限循环`);
 }
 
 /**

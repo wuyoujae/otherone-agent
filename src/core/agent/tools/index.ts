@@ -63,7 +63,8 @@ export async function ProcessTools(tool_calls: any[], tools_realize: Record<stri
             console.log(`调用Tool: ${functionName}, 参数:`, args);
             
             // 调用函数（支持同步和异步函数）
-            const result = await functionImpl(args);
+            // 将args对象的值按照函数参数顺序传递
+            const result = await functionImpl(...Object.values(args));
             
             console.log(`Tool ${functionName} 执行成功，结果:`, result);
 

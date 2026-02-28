@@ -1,6 +1,6 @@
 {
   "name": "otherone-agent",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A lightweight, extensible AI Agent framework built with Node.js and TypeScript",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

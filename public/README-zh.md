@@ -40,6 +40,10 @@ npm install otherone-agent
 
 ## 🚀 快速开始
 
+> 💡 **AI 快速开发提示**：可以发送下面这个 prompt 使用 AI 快速开发：
+> 
+> "阅读这个链接：https://github.com/wuyoujae/otherone-agent，请你使用 otherone-agent 帮我快速开发一个带 webui 的对话 agent"
+
 ### 基础使用
 
 ```typescript

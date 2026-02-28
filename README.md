@@ -40,6 +40,10 @@ npm install otherone-agent
 
 ## 🚀 Quick Start
 
+> 💡 **AI Quick Development Tip**: You can send this prompt to AI for rapid development:
+> 
+> "Read this link: https://github.com/wuyoujae/otherone-agent, please help me quickly develop a conversational agent with webui using otherone-agent"
+
 ### Basic Usage
 
 ```typescript

@@ -1,6 +1,14 @@
 /**
  * otherone-agent - 轻量级AI Agent基础架构
  * 作用：包的主入口文件，导出veloca对象和类型定义
+ * 
+ * 主要功能：
+ * - InvokeAgent: 核心Agent调用方法，支持流式和非流式响应
+ *   - 流式模式：设置 ai.stream = true，返回异步生成器
+ *   - 非流式模式：设置 ai.stream = false，返回完整响应对象
+ * - 自动tool循环处理
+ * - 上下文管理和压缩
+ * - 多种存储方式支持
  */
 
 // 导入所有模块
@@ -19,6 +27,22 @@ import { CreateNewSession } from './core/agent/context/storage/localfile/writer'
  * 作用：veloca核心对象，封装所有公开API
  * 关联：用户通过导入veloca对象来使用所有功能
  * 预期结果：提供统一的API入口，简化用户使用
+ * 
+ * 使用示例：
+ * 
+ * // 流式响应
+ * const stream = await veloca.InvokeAgent(input, { ...ai, stream: true });
+ * for await (const chunk of stream) {
+ *     if (chunk.type === 'tool_calls') {
+ *         console.log(chunk.content);  // [tool_calls:xxx]
+ *     } else if (chunk.choices?.[0]?.delta?.content) {
+ *         process.stdout.write(chunk.choices[0].delta.content);
+ *     }
+ * }
+ * 
+ * // 非流式响应
+ * const response = await veloca.InvokeAgent(input, { ...ai, stream: false });
+ * console.log(response.content);
  */
 export const veloca = {
     // Agent核心方法
@@ -91,3 +115,24 @@ export type {
 export type {
     ToolsOptions
 } from './core/agent/tools/types';
+
+// 直接导出各个函数，方便用户使用
+export {
+    InvokeAgent,
+    InvokeModel,
+    ProcessTools,
+    CombineTools,
+    CombineContext,
+    CompactMessages,
+    CheckThreshold,
+    EstimateTokens,
+    WriteEntry,
+    WriteCompactedEntry,
+    ReadSessionData,
+    ReadStorageFile,
+    GetAllSessions,
+    CreateNewSession
+};
+
+// 默认导出veloca对象
+export default veloca;

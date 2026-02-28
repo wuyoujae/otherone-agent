@@ -7,9 +7,24 @@ import { WriteEntry } from '../../context/storage';
 /**
  * 作用：调用Agent，驱动整个AI对话流程
  * 关联：调用ai模块、contextManager、toolsCalling等其他模块，是整个Agent的核心驱动
- * 预期结果：根据input和ai配置，执行完整的Agent循环，返回最终响应
+ * 预期结果：根据input和ai配置，执行完整的Agent循环，返回最终响应或流式生成器
  */
 export async function InvokeAgent(input: InputOptions, ai: AIOptions): Promise<any> {
+    // 如果启用流式响应，调用流式版本
+    if (ai.stream) {
+        return InvokeAgentStream(input, ai);
+    }
+    
+    // 非流式版本（原有逻辑）
+    return InvokeAgentNonStream(input, ai);
+}
+
+/**
+ * 作用：非流式版本的Agent调用
+ * 关联：被InvokeAgent调用，处理非流式响应
+ * 预期结果：返回最终的解析结果对象
+ */
+async function InvokeAgentNonStream(input: InputOptions, ai: AIOptions): Promise<any> {
     // 如果有userPrompt，先存储用户消息
     if (ai.userPrompt) {
         WriteEntry({
@@ -48,106 +63,286 @@ export async function InvokeAgent(input: InputOptions, ai: AIOptions): Promise<a
         // 调用AI模型
         const response = await InvokeModel(ai);
         
-        // 检查是否是流式响应
-        if (response && typeof response[Symbol.asyncIterator] === 'function') {
-            // 处理流式响应
-            const parsedResponse = await ParseStreamResponse(response, ai.provider);
-            
-            // 存储AI响应到storage
-            WriteEntry({
-                storageType: input.storageType || 'localfile',
-                sessionId: input.sessionId,
-                role: parsedResponse.role,
-                content: parsedResponse.content,
-                tools: parsedResponse.tools,
-                tokenConsumption: parsedResponse.token_consumption
-            });
-            
-            // 检查是否有tool调用
-            if (parsedResponse.tools && parsedResponse.tools.tool_calls && parsedResponse.tools.tool_calls.length > 0) {
-                // 处理tool调用
-                const toolResults = await ProcessTools(parsedResponse.tools.tool_calls, ai.tools_realize || {});
-                
-                // 遍历每个tool结果，分别存储
-                for (const toolResult of toolResults) {
-                    // 将单个tool结果转换为content字符串
-                    const toolResultContent = JSON.stringify(toolResult.result || toolResult.error);
-                    
-                    // 存储单个tool结果（role为'tool'）
-                    WriteEntry({
-                        storageType: input.storageType || 'localfile',
-                        sessionId: input.sessionId,
-                        role: 'tool',
-                        content: toolResultContent,
-                        tools: {
-                            tool_call_id: toolResult.tool_call_id,
-                            function_name: toolResult.function_name,
-                            result: toolResult.result,
-                            error: toolResult.error
-                        }
-                    });
-                }
-                
-                // 添加1.5秒延迟，避免调用过快
-                await Sleep(1500);
-                
-                // 继续while循环，不要return
-                continue;
-            }
-            
-            return parsedResponse;
-        } else {
-            // 处理非流式响应
-            const parsedResponse = ParseAIResponse(response, ai.provider);
-            
-            // 存储AI响应到storage
-            WriteEntry({
-                storageType: input.storageType || 'localfile',
-                sessionId: input.sessionId,
-                role: parsedResponse.role,
-                content: parsedResponse.content,
-                tools: parsedResponse.tools,
-                tokenConsumption: parsedResponse.token_consumption
-            });
-            
-            // 检查是否有tool调用
-            if (parsedResponse.tools && parsedResponse.tools.tool_calls && parsedResponse.tools.tool_calls.length > 0) {
-                // 处理tool调用
-                const toolResults = await ProcessTools(parsedResponse.tools.tool_calls, ai.tools_realize || {});
-                
-                // 遍历每个tool结果，分别存储
-                for (const toolResult of toolResults) {
-                    // 将单个tool结果转换为content字符串
-                    const toolResultContent = JSON.stringify(toolResult.result || toolResult.error);
-                    
-                    // 存储单个tool结果（role为'tool'）
-                    WriteEntry({
-                        storageType: input.storageType || 'localfile',
-                        sessionId: input.sessionId,
-                        role: 'tool',
-                        content: toolResultContent,
-                        tools: {
-                            tool_call_id: toolResult.tool_call_id,
-                            function_name: toolResult.function_name,
-                            result: toolResult.result,
-                            error: toolResult.error
-                        }
-                    });
-                }
-                
-                // 添加1.5秒延迟，避免调用过快
-                await Sleep(1500);
-                
-                // 继续while循环，不要return
-                continue;
-            }
-            
-            return parsedResponse;
+        // 处理响应
+        const parsedResponse = ParseAIResponse(response, ai.provider);
+        
+        // 如果有thinking内容，添加到content前面
+        if (parsedResponse.thinking) {
+            parsedResponse.content = `[thinking:${parsedResponse.thinking}]\n\n${parsedResponse.content}`;
         }
+        
+        // 存储AI响应到storage
+        WriteEntry({
+            storageType: input.storageType || 'localfile',
+            sessionId: input.sessionId,
+            role: parsedResponse.role,
+            content: parsedResponse.content,
+            tools: parsedResponse.tools,
+            tokenConsumption: parsedResponse.token_consumption
+        });
+        
+        // 检查是否有tool调用
+        if (parsedResponse.tools && parsedResponse.tools.tool_calls && parsedResponse.tools.tool_calls.length > 0) {
+            // 添加tool_calls信息到返回内容
+            const toolCallsInfo = parsedResponse.tools.tool_calls.map((tc: any) => 
+                `${tc.function.name}(${tc.function.arguments})`
+            ).join(', ');
+            parsedResponse.content = `[tool_calls:${toolCallsInfo}]\n\n${parsedResponse.content}`;
+            
+            // 处理tool调用
+            const toolResults = await ProcessTools(parsedResponse.tools.tool_calls, ai.tools_realize || {});
+            
+            // 遍历每个tool结果，分别存储
+            for (const toolResult of toolResults) {
+                // 将单个tool结果转换为content字符串
+                const toolResultContent = JSON.stringify(toolResult.result || toolResult.error);
+                
+                // 存储单个tool结果（role为'tool'）
+                WriteEntry({
+                    storageType: input.storageType || 'localfile',
+                    sessionId: input.sessionId,
+                    role: 'tool',
+                    content: toolResultContent,
+                    tools: {
+                        tool_call_id: toolResult.tool_call_id,
+                        function_name: toolResult.function_name,
+                        result: toolResult.result,
+                        error: toolResult.error
+                    }
+                });
+            }
+            
+            // 添加1.5秒延迟，避免调用过快
+            await Sleep(1500);
+            
+            // 继续while循环，不要return
+            continue;
+        }
+        
+        return parsedResponse;
     }
     
     // 如果循环次数超限，抛出错误
     throw new Error(`Agent循环次数超过限制(${maxIterations}次)，可能陷入无限循环`);
+}
+
+/**
+ * 作用：流式版本的Agent调用
+ * 关联：被InvokeAgent调用，处理流式响应
+ * 预期结果：返回异步生成器，实时yield chunk，同时在后台处理tool循环
+ */
+async function* InvokeAgentStream(input: InputOptions, ai: AIOptions): AsyncGenerator<any, any, unknown> {
+    // 如果有userPrompt，先存储用户消息
+    if (ai.userPrompt) {
+        WriteEntry({
+            storageType: input.storageType || 'localfile',
+            sessionId: input.sessionId,
+            role: 'user',
+            content: ai.userPrompt
+        });
+    }
+    
+    // 从input参数读取循环次数限制，默认999999
+    const maxIterations = input.maxIterations || 999999;
+    let iteration = 0;
+    
+    while(iteration < maxIterations){
+        iteration++;
+        
+        try {
+            // 组合tools配置
+            CombineTools(ai);
+            
+            // 组合context配置，加载历史消息
+            const messages = await CombineContext({
+                sessionId: input.sessionId,
+                loadType: input.contextLoadType,
+                provider: ai.provider,
+                contextWindow: input.contextWindow,
+                thresholdPercentage: input.thresholdPercentage,
+                ai: ai,
+                systemPrompt: ai.systemPrompt,
+                tools: ai.tools
+            });
+            
+            // 将历史消息添加到ai配置中
+            ai.messages = messages;
+            
+            // 调用AI模型
+            const response = await InvokeModel(ai);
+            
+            // 检查是否是流式响应
+            if (response && typeof response[Symbol.asyncIterator] === 'function') {
+                // 累积变量
+                let fullContent = '';
+                let role = 'assistant';
+                let toolCalls: any[] = [];
+                let thinking: string | null = null;
+                let tokenConsumption = 0;
+                
+                // 遍历stream，实时yield给调用者
+                for await (const chunk of response) {
+                    // 实时yield原始chunk
+                    yield chunk;
+                    
+                    // 同时累积数据用于后续处理
+                    const delta = chunk.choices?.[0]?.delta;
+                    
+                    if (!delta) {
+                        continue;
+                    }
+                    
+                    // 提取role
+                    if (delta.role) {
+                        role = delta.role;
+                    }
+                    
+                    // 累积content
+                    if (delta.content) {
+                        fullContent += delta.content;
+                    }
+                    
+                    // 处理tool_calls（流式累积）
+                    if (delta.tool_calls) {
+                        for (const toolCall of delta.tool_calls) {
+                            const index = toolCall.index;
+                            if (!toolCalls[index]) {
+                                toolCalls[index] = {
+                                    id: toolCall.id || '',
+                                    type: toolCall.type || 'function',
+                                    function: {
+                                        name: '',
+                                        arguments: ''
+                                    }
+                                };
+                            }
+                            
+                            if (toolCall.id) {
+                                toolCalls[index].id = toolCall.id;
+                            }
+                            
+                            if (toolCall.function?.name) {
+                                toolCalls[index].function.name += toolCall.function.name;
+                            }
+                            
+                            if (toolCall.function?.arguments) {
+                                toolCalls[index].function.arguments += toolCall.function.arguments;
+                            }
+                        }
+                    }
+                    
+                    // 提取usage
+                    if (chunk.usage) {
+                        tokenConsumption = chunk.usage.total_tokens || 0;
+                    }
+                }
+                
+                // stream结束，构建完整响应
+                const parsedResponse: any = {
+                    content: fullContent,
+                    role,
+                    token_consumption: tokenConsumption,
+                    tools: toolCalls.length > 0 ? { tool_calls: toolCalls } : null,
+                    thinking
+                };
+                
+                // 如果有thinking，yield thinking信息
+                if (parsedResponse.thinking) {
+                    yield {
+                        type: 'thinking',
+                        content: `[thinking:${parsedResponse.thinking}]`
+                    };
+                }
+                
+                // 存储AI响应到storage
+                WriteEntry({
+                    storageType: input.storageType || 'localfile',
+                    sessionId: input.sessionId,
+                    role: parsedResponse.role,
+                    content: parsedResponse.content,
+                    tools: parsedResponse.tools,
+                    tokenConsumption: parsedResponse.token_consumption
+                });
+                
+                // 检查是否有tool调用
+                if (parsedResponse.tools && parsedResponse.tools.tool_calls && parsedResponse.tools.tool_calls.length > 0) {
+                    // yield tool_calls信息
+                    const toolCallsInfo = parsedResponse.tools.tool_calls.map((tc: any) => 
+                        `${tc.function.name}(${tc.function.arguments})`
+                    ).join(', ');
+                    
+                    yield {
+                        type: 'tool_calls',
+                        content: `[tool_calls:${toolCallsInfo}]`
+                    };
+                    
+                    // 处理tool调用
+                    const toolResults = await ProcessTools(parsedResponse.tools.tool_calls, ai.tools_realize || {});
+                    
+                    // 遍历每个tool结果，分别存储
+                    for (const toolResult of toolResults) {
+                        // 将单个tool结果转换为content字符串
+                        const toolResultContent = JSON.stringify(toolResult.result || toolResult.error);
+                        
+                        // 存储单个tool结果（role为'tool'）
+                        WriteEntry({
+                            storageType: input.storageType || 'localfile',
+                            sessionId: input.sessionId,
+                            role: 'tool',
+                            content: toolResultContent,
+                            tools: {
+                                tool_call_id: toolResult.tool_call_id,
+                                function_name: toolResult.function_name,
+                                result: toolResult.result,
+                                error: toolResult.error
+                            }
+                        });
+                    }
+                    
+                    // 添加1.5秒延迟，避免调用过快
+                    await Sleep(1500);
+                    
+                    // 继续while循环
+                    continue;
+                }
+                
+                // 没有tool调用，返回最终结果
+                return parsedResponse;
+                
+            } else {
+                // 非流式响应（不应该发生，因为ai.stream=true）
+                const parsedResponse = ParseAIResponse(response, ai.provider);
+                
+                // yield完整响应
+                yield {
+                    type: 'complete',
+                    content: parsedResponse.content,
+                    ...parsedResponse
+                };
+                
+                return parsedResponse;
+            }
+            
+        } catch (error: any) {
+            // 错误处理：yield错误信息
+            yield {
+                type: 'error',
+                content: `[error:${error.message}]`,
+                error: error.message
+            };
+            
+            throw error;
+        }
+    }
+    
+    // 如果循环次数超限，抛出错误
+    const errorMsg = `Agent循环次数超过限制(${maxIterations}次)，可能陷入无限循环`;
+    yield {
+        type: 'error',
+        content: `[error:${errorMsg}]`,
+        error: errorMsg
+    };
+    throw new Error(errorMsg);
 }
 
 /**
@@ -157,127 +352,6 @@ export async function InvokeAgent(input: InputOptions, ai: AIOptions): Promise<a
  */
 function Sleep(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-/**
- * 作用：处理流式响应
- * 关联：被InvokeAgent调用，处理Stream类型的响应
- * 预期结果：返回完整的解析结果对象
- */
-async function ParseStreamResponse(stream: any, provider: string): Promise<any> {
-    // 根据provider类型进行不同处理
-    switch (provider) {
-        case 'openai':
-            return await ParseOpenAIStreamResponse(stream);
-        case 'anthropic':
-            return await ParseAnthropicStreamResponse(stream);
-        case 'fetch':
-            return await ParseFetchStreamResponse(stream);
-        default:
-            throw new Error(`Unsupported provider type: ${provider}`);
-    }
-}
-
-/**
- * 作用：处理OpenAI的流式响应
- * 关联：被ParseStreamResponse调用
- * 预期结果：返回完整的解析结果对象
- */
-async function ParseOpenAIStreamResponse(stream: any): Promise<any> {
-    let fullContent = '';
-    let role = 'assistant';
-    let toolCalls: any[] = [];
-    let thinking = null;
-    let tokenConsumption = 0;
-    
-    try {
-        for await (const chunk of stream) {
-            const delta = chunk.choices?.[0]?.delta;
-            
-            if (!delta) {
-                continue;
-            }
-            
-            // 提取role（通常只在第一个chunk出现）
-            if (delta.role) {
-                role = delta.role;
-            }
-            
-            // 累积content
-            if (delta.content) {
-                fullContent += delta.content;
-            }
-            
-            // 处理tool_calls（流式tool_calls需要累积）
-            if (delta.tool_calls) {
-                for (const toolCall of delta.tool_calls) {
-                    const index = toolCall.index;
-                    if (!toolCalls[index]) {
-                        toolCalls[index] = {
-                            id: toolCall.id || '',
-                            type: toolCall.type || 'function',
-                            function: {
-                                name: '',
-                                arguments: ''
-                            }
-                        };
-                    }
-                    
-                    if (toolCall.id) {
-                        toolCalls[index].id = toolCall.id;
-                    }
-                    
-                    if (toolCall.function?.name) {
-                        toolCalls[index].function.name += toolCall.function.name;
-                    }
-                    
-                    if (toolCall.function?.arguments) {
-                        toolCalls[index].function.arguments += toolCall.function.arguments;
-                    }
-                }
-            }
-            
-            // 提取usage（通常在最后一个chunk）
-            if (chunk.usage) {
-                tokenConsumption = chunk.usage.total_tokens || 0;
-            }
-        }
-        
-        // 构建最终结果
-        const result: any = {
-            content: fullContent,
-            role,
-            token_consumption: tokenConsumption,
-            tools: toolCalls.length > 0 ? { tool_calls: toolCalls } : null,
-            thinking
-        };
-        
-        return result;
-        
-    } catch (error: any) {
-        console.error('处理流式响应时出错:', error.message);
-        throw error;
-    }
-}
-
-/**
- * 作用：处理Anthropic的流式响应
- * 关联：被ParseStreamResponse调用
- * 预期结果：返回完整的解析结果对象
- */
-async function ParseAnthropicStreamResponse(stream: any): Promise<any> {
-    // TODO: 实现Anthropic流式响应解析
-    throw new Error('Anthropic stream response parsing not implemented yet');
-}
-
-/**
- * 作用：处理Fetch的流式响应
- * 关联：被ParseStreamResponse调用
- * 预期结果：返回完整的解析结果对象
- */
-async function ParseFetchStreamResponse(stream: any): Promise<any> {
-    // TODO: 实现Fetch流式响应解析
-    throw new Error('Fetch stream response parsing not implemented yet');
 }
 
 /**

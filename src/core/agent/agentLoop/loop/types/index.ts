@@ -39,6 +39,8 @@ export interface AIOptions {
     baseUrl: string;
     // 模型名称
     model: string;
+    // 用户提示词（本次对话的用户输入）
+    userPrompt?: string;
     // 系统提示词
     systemPrompt?: string;
     // 消息列表

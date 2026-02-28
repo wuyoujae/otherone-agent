@@ -10,21 +10,14 @@ import { WriteEntry } from '../../context/storage';
  * 预期结果：根据input和ai配置，执行完整的Agent循环，返回最终响应
  */
 export async function InvokeAgent(input: InputOptions, ai: AIOptions): Promise<any> {
-    // 保存用户首次传入的messages（如果有）
-    const initialMessages = ai.messages && ai.messages.length > 0 ? [...ai.messages] : null;
-    
-    // 如果是首次调用且有初始消息，先存储用户消息
-    if (initialMessages) {
-        for (const msg of initialMessages) {
-            if (msg.role === 'user') {
-                WriteEntry({
-                    storageType: input.storageType || 'localfile',
-                    sessionId: input.sessionId,
-                    role: 'user',
-                    content: msg.content
-                });
-            }
-        }
+    // 如果有userPrompt，先存储用户消息
+    if (ai.userPrompt) {
+        WriteEntry({
+            storageType: input.storageType || 'localfile',
+            sessionId: input.sessionId,
+            role: 'user',
+            content: ai.userPrompt
+        });
     }
     
     // 从input参数读取循环次数限制，默认999999

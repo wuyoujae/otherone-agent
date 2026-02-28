@@ -39,6 +39,26 @@ export function ReadStorageFile(): any {
 }
 
 /**
+ * 作用：查询所有session信息
+ * 关联：被用户调用，用于获取所有会话列表
+ * 预期结果：返回所有session的基本信息数组（不包含entries和compacted_entries）
+ */
+export function GetAllSessions(): any[] {
+    // 读取完整存储数据
+    const allData = ReadStorageFile();
+    
+    // 返回sessions数组，只包含基本信息
+    const sessions = allData.sessions || [];
+    
+    // 过滤掉entries和compacted_entries字段
+    return sessions.map((session: any) => ({
+        session_id: session.session_id,
+        status: session.status,
+        create_at: session.create_at
+    }));
+}
+
+/**
  * 作用：根据session_id读取该会话的所有数据
  * 关联：被localfile/index.ts调用，读取指定会话的session、entries和compacted_entries
  * 预期结果：返回包含该会话所有相关数据的对象，如果session不存在则返回空数据结构

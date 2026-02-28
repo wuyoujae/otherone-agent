@@ -3,6 +3,50 @@ import * as path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 
 /**
+ * 作用：创建新的session
+ * 关联：被用户调用，用于开始新的对话会话
+ * 预期结果：生成新的session_id并插入到存储文件中，返回session_id
+ */
+export function CreateNewSession(): string {
+    // 获取存储文件路径
+    const storagePath = path.join(process.cwd(), '.veloca', 'storage', 'veloca-storage.json');
+
+    // 确保目录存在
+    const storageDir = path.dirname(storagePath);
+    if (!fs.existsSync(storageDir)) {
+        fs.mkdirSync(storageDir, { recursive: true });
+    }
+
+    // 读取现有数据
+    let storageData: any = { sessions: [] };
+    if (fs.existsSync(storagePath)) {
+        const fileContent = fs.readFileSync(storagePath, 'utf-8');
+        storageData = JSON.parse(fileContent);
+    }
+
+    // 生成新的session_id
+    const sessionId = uuidv4();
+
+    // 创建新的session对象
+    const newSession = {
+        session_id: sessionId,
+        status: 0,
+        create_at: new Date().toISOString(),
+        entries: [],
+        compacted_entries: []
+    };
+
+    // 添加到sessions数组
+    storageData.sessions.push(newSession);
+
+    // 写回文件
+    fs.writeFileSync(storagePath, JSON.stringify(storageData, null, 2), 'utf-8');
+
+    // 返回session_id
+    return sessionId;
+}
+
+/**
  * 作用：将entry写入本地JSON文件
  * 关联：被storage/index.ts调用
  * 预期结果：将entry数据追加到.veloca/storage/veloca-storage.json文件中

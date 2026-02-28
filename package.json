@@ -1,15 +1,40 @@
 {
-  "name": "veloca",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "name": "otherone-agent",
+  "version": "0.1.0",
+  "description": "A lightweight, extensible AI Agent framework built with Node.js and TypeScript",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "npm run build",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": [],
+  "keywords": [
+    "ai",
+    "agent",
+    "llm",
+    "openai",
+    "chatbot",
+    "conversation",
+    "context-management",
+    "tool-calling",
+    "typescript"
+  ],
   "author": "",
-  "license": "ISC",
+  "license": "MIT",
   "type": "commonjs",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": ""
+  },
   "dependencies": {
     "openai": "^6.25.0",
     "uuid": "^13.0.0"
@@ -17,6 +42,7 @@
   "devDependencies": {
     "@types/node": "^25.3.1",
     "@types/uuid": "^10.0.0",
-    "ts-node": "^10.9.2"
+    "ts-node": "^10.9.2",
+    "typescript": "^5.0.0"
   }
 }

@@ -1,0 +1,49 @@
+# Source files
+src/
+tsconfig.json
+
+# Test files
+test-script/
+*.test.ts
+*.spec.ts
+
+# Documentation
+docs/
+AGENTS.md
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+.travis.yml
+
+# Development
+node_modules/
+.env
+.env.*
+!.env.example
+
+# Build artifacts
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Runtime data
+.veloca/
+.claude/
+
+# OS
+.DS_Store
+Thumbs.db

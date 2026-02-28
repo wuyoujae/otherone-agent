@@ -1,27 +1,50 @@
 /**
  * otherone-agent - 轻量级AI Agent基础架构
- * 作用：包的主入口文件，导出所有公开API
+ * 作用：包的主入口文件，导出veloca对象和类型定义
  */
 
-// 导出核心Agent循环
-export { InvokeAgent } from './core/agent/agentLoop/loop';
+// 导入所有模块
+import { InvokeAgent } from './core/agent/agentLoop/loop';
+import { InvokeModel } from './core/agent/agentLoop/ai';
+import { ProcessTools, CombineTools } from './core/agent/tools';
+import { CombineContext } from './core/agent/context/combineContext';
+import { CompactMessages } from './core/agent/context/compact';
+import { CheckThreshold } from './core/agent/context/compact/checkThreshold';
+import { EstimateTokens } from './core/agent/context/compact/estimateTokens';
+import { WriteEntry, WriteCompactedEntry } from './core/agent/context/storage';
+import { ReadSessionData, ReadStorageFile, GetAllSessions } from './core/agent/context/storage/localfile/reader';
+import { CreateNewSession } from './core/agent/context/storage/localfile/writer';
 
-// 导出AI模块
-export { InvokeModel } from './core/agent/agentLoop/ai';
-
-// 导出工具模块
-export { ProcessTools, CombineTools } from './core/agent/tools';
-
-// 导出上下文管理模块
-export { CombineContext } from './core/agent/context/combineContext';
-export { CompactMessages } from './core/agent/context/compact';
-export { CheckThreshold } from './core/agent/context/compact/checkThreshold';
-export { EstimateTokens } from './core/agent/context/compact/estimateTokens';
-
-// 导出存储模块
-export { WriteEntry, WriteCompactedEntry } from './core/agent/context/storage';
-export { ReadSessionData, ReadStorageFile, GetAllSessions } from './core/agent/context/storage/localfile/reader';
-export { CreateNewSession } from './core/agent/context/storage/localfile/writer';
+/**
+ * 作用：veloca核心对象，封装所有公开API
+ * 关联：用户通过导入veloca对象来使用所有功能
+ * 预期结果：提供统一的API入口，简化用户使用
+ */
+export const veloca = {
+    // Agent核心方法
+    InvokeAgent,
+    
+    // AI模块方法
+    InvokeModel,
+    
+    // 工具模块方法
+    ProcessTools,
+    CombineTools,
+    
+    // 上下文管理方法
+    CombineContext,
+    CompactMessages,
+    CheckThreshold,
+    EstimateTokens,
+    
+    // 存储模块方法
+    WriteEntry,
+    WriteCompactedEntry,
+    ReadSessionData,
+    ReadStorageFile,
+    GetAllSessions,
+    CreateNewSession
+};
 
 // 导出类型定义
 export type {

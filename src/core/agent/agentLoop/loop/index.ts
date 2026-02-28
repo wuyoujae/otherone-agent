@@ -95,6 +95,9 @@ export async function InvokeAgent(input: InputOptions, ai: AIOptions): Promise<a
                     });
                 }
                 
+                // 添加1.5秒延迟，避免调用过快
+                await Sleep(1500);
+                
                 // 继续while循环，不要return
                 continue;
             }
@@ -139,6 +142,9 @@ export async function InvokeAgent(input: InputOptions, ai: AIOptions): Promise<a
                     });
                 }
                 
+                // 添加1.5秒延迟，避免调用过快
+                await Sleep(1500);
+                
                 // 继续while循环，不要return
                 continue;
             }
@@ -149,6 +155,15 @@ export async function InvokeAgent(input: InputOptions, ai: AIOptions): Promise<a
     
     // 如果循环次数超限，抛出错误
     throw new Error(`Agent循环次数超过限制(${maxIterations}次)，可能陷入无限循环`);
+}
+
+/**
+ * 作用：延迟函数，用于在循环中添加等待时间
+ * 关联：被InvokeAgent调用，避免API调用过快
+ * 预期结果：等待指定的毫秒数后继续执行
+ */
+function Sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 /**

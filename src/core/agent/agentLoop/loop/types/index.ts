@@ -25,6 +25,8 @@ export interface InputOptions {
     contextWindow: number;
     // 触发压缩的阈值百分比（默认0.8，即80%）
     thresholdPercentage?: number;
+    // 最大循环次数（默认999999）
+    maxIterations?: number;
 }
 
 // AI配置参数类型定义

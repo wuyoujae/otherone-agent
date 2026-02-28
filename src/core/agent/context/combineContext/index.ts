@@ -10,8 +10,6 @@ import { CompactMessages } from '../compact';
  * 预期结果：返回messages数组，包含历史对话记录
  */
 export async function CombineContext(options: CombineContextOptions): Promise<any[]> {
-    console.log(`[CombineContext] 开始加载上下文，sessionId: ${options.sessionId}`);
-    
     // 参数有效性检查
     if (!options.sessionId) {
         throw new Error('sessionId is required');
@@ -315,9 +313,6 @@ function TransformToMessages(sessionData: any, provider: string, compactedSummar
  * 预期结果：返回OpenAI格式的messages数组
  */
 function TransformToOpenAIFormat(sessionData: any, compactedSummary: string | null): any[] {
-    console.log('[TransformToOpenAIFormat] 开始转换消息');
-    console.log(`[TransformToOpenAIFormat] entries数量: ${sessionData.entries?.length || 0}`);
-    
     const messages: any[] = [];
     
     // 如果有压缩摘要，作为第一条user消息添加
@@ -326,16 +321,12 @@ function TransformToOpenAIFormat(sessionData: any, compactedSummary: string | nu
             role: 'user',
             content: compactedSummary
         });
-        console.log('[TransformToOpenAIFormat] 添加了压缩摘要');
     }
     
     // 检查是否有entries
     if (!sessionData.entries || sessionData.entries.length === 0) {
-        console.log('[TransformToOpenAIFormat] 没有entries，返回空消息数组');
         return messages;
     }
-    
-    console.log(`[TransformToOpenAIFormat] 处理 ${sessionData.entries.length} 条entries`);
     
     // entries已经是按时间顺序排列的（从早到晚），直接遍历即可
     for (const entry of sessionData.entries) {
@@ -343,8 +334,6 @@ function TransformToOpenAIFormat(sessionData: any, compactedSummary: string | nu
             role: entry.role,
             content: entry.content
         };
-        
-        console.log(`[TransformToOpenAIFormat] 添加消息: role=${entry.role}, content=${entry.content.substring(0, 30)}...`);
         
         // 如果是assistant且有tool_calls，添加tool_calls字段
         if (entry.role === 'assistant' && entry.tools && entry.tools.tool_calls) {
@@ -369,8 +358,6 @@ function TransformToOpenAIFormat(sessionData: any, compactedSummary: string | nu
         
         messages.push(message);
     }
-    
-    console.log(`[TransformToOpenAIFormat] 转换完成，共 ${messages.length} 条消息\n`);
     
     return messages;
 }

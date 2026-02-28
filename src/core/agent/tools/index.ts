@@ -60,13 +60,9 @@ export async function ProcessTools(tool_calls: any[], tools_realize: Record<stri
 
         // 调用函数
         try {
-            console.log(`调用Tool: ${functionName}, 参数:`, args);
-            
             // 调用函数（支持同步和异步函数）
             // 将args对象的值按照函数参数顺序传递
             const result = await functionImpl(...Object.values(args));
-            
-            console.log(`Tool ${functionName} 执行成功，结果:`, result);
 
             // 将结果添加到结果数组
             results.push({
@@ -76,8 +72,6 @@ export async function ProcessTools(tool_calls: any[], tools_realize: Record<stri
             });
 
         } catch (error: any) {
-            console.error(`Tool ${functionName} 执行失败:`, error.message);
-            
             // 即使失败也要记录结果
             results.push({
                 tool_call_id: toolCallId,

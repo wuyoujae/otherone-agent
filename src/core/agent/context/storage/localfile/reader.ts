@@ -44,8 +44,6 @@ export function ReadStorageFile(): any {
  * 预期结果：返回包含该会话所有相关数据的对象，如果session不存在则返回空数据结构
  */
 export function ReadSessionData(sessionId: string): any {
-    console.log(`[ReadSessionData] 读取session: ${sessionId}`);
-    
     // 参数检查
     if (!sessionId) {
         throw new Error('sessionId is required');
@@ -57,14 +55,8 @@ export function ReadSessionData(sessionId: string): any {
     // 查找指定的session
     const session = allData.sessions.find((s: any) => s.session_id === sessionId && s.status === 0);
     
-    console.log(`[ReadSessionData] 找到session: ${session ? '是' : '否'}`);
-    if (session) {
-        console.log(`[ReadSessionData] Session中有 ${session.entries?.length || 0} 条entries`);
-    }
-    
     // 如果session不存在，返回空数据结构（首次调用的情况）
     if (!session) {
-        console.log('[ReadSessionData] Session不存在，返回空数据结构\n');
         return {
             session: null,
             entries: [],
@@ -75,8 +67,6 @@ export function ReadSessionData(sessionId: string): any {
     // 从session中获取entries和compacted_entries
     const entries = session.entries || [];
     const compactedEntries = session.compacted_entries || [];
-    
-    console.log(`[ReadSessionData] 返回 ${entries.length} 条entries\n`);
     
     return {
         session,

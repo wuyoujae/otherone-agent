@@ -15,10 +15,8 @@ export async function InvokeAgent(input: InputOptions, ai: AIOptions): Promise<a
     
     // 如果是首次调用且有初始消息，先存储用户消息
     if (initialMessages) {
-        console.log('[InvokeAgent] 存储初始用户消息...');
         for (const msg of initialMessages) {
             if (msg.role === 'user') {
-                console.log(`[InvokeAgent] 存储user消息: ${msg.content.substring(0, 50)}...`);
                 WriteEntry({
                     storageType: input.storageType || 'localfile',
                     sessionId: input.sessionId,
@@ -27,16 +25,14 @@ export async function InvokeAgent(input: InputOptions, ai: AIOptions): Promise<a
                 });
             }
         }
-        console.log('[InvokeAgent] 用户消息存储完成\n');
     }
     
-    // 添加循环次数限制，防止无限循环
-    const maxIterations = 10;
+    // 从input参数读取循环次数限制，默认999999
+    const maxIterations = input.maxIterations || 999999;
     let iteration = 0;
     
     while(iteration < maxIterations){
         iteration++;
-        console.log(`\n=== 循环第 ${iteration} 次 ===\n`);
         
         // 组合tools配置
         CombineTools(ai);
@@ -77,9 +73,7 @@ export async function InvokeAgent(input: InputOptions, ai: AIOptions): Promise<a
             // 检查是否有tool调用
             if (parsedResponse.tools && parsedResponse.tools.tool_calls && parsedResponse.tools.tool_calls.length > 0) {
                 // 处理tool调用
-                console.log('检测到Tool调用，数量:', parsedResponse.tools.tool_calls.length);
                 const toolResults = await ProcessTools(parsedResponse.tools.tool_calls, ai.tools_realize || {});
-                console.log('Tool调用结果:', toolResults);
                 
                 // 遍历每个tool结果，分别存储
                 for (const toolResult of toolResults) {
@@ -99,11 +93,8 @@ export async function InvokeAgent(input: InputOptions, ai: AIOptions): Promise<a
                             error: toolResult.error
                         }
                     });
-                    
-                    console.log(`Tool ${toolResult.function_name} 结果已存储`);
                 }
                 
-                console.log('所有Tool结果已存储，继续循环...\n');
                 // 继续while循环，不要return
                 continue;
             }
@@ -126,9 +117,7 @@ export async function InvokeAgent(input: InputOptions, ai: AIOptions): Promise<a
             // 检查是否有tool调用
             if (parsedResponse.tools && parsedResponse.tools.tool_calls && parsedResponse.tools.tool_calls.length > 0) {
                 // 处理tool调用
-                console.log('检测到Tool调用，数量:', parsedResponse.tools.tool_calls.length);
                 const toolResults = await ProcessTools(parsedResponse.tools.tool_calls, ai.tools_realize || {});
-                console.log('Tool调用结果:', toolResults);
                 
                 // 遍历每个tool结果，分别存储
                 for (const toolResult of toolResults) {
@@ -148,11 +137,8 @@ export async function InvokeAgent(input: InputOptions, ai: AIOptions): Promise<a
                             error: toolResult.error
                         }
                     });
-                    
-                    console.log(`Tool ${toolResult.function_name} 结果已存储`);
                 }
                 
-                console.log('所有Tool结果已存储，继续循环...\n');
                 // 继续while循环，不要return
                 continue;
             }

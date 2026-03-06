@@ -119,11 +119,12 @@ export async function CompactMessages(options: CompactOptions): Promise<any[]> {
             throw new Error('Unable to find trigger_entry_id for compaction');
         }
         
-        WriteCompactedEntry({
+        await WriteCompactedEntry({
             storageType: options.storageType,
             sessionId: options.sessionId,
             summary: compressedSummary,
-            triggerEntryId: triggerEntryId
+            triggerEntryId: triggerEntryId,
+            databaseConfig: options.databaseConfig
         });
     }
 

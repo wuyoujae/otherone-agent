@@ -28,4 +28,6 @@ export interface CombineContextOptions {
     systemPrompt?: string;
     // 工具定义数组
     tools?: any[];
+    // 数据库存储配置（当loadType为database时必填）
+    databaseConfig?: import('../../storage/database/types').DatabaseConfig;
 }

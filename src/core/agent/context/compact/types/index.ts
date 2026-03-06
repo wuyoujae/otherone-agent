@@ -22,6 +22,8 @@ export interface CompactOptions {
     sessionId?: string;
     // 存储类型（用于存储压缩记录）
     storageType?: 'localfile' | 'database';
+    // 数据库存储配置（当storageType为database时必填）
+    databaseConfig?: import('../../storage/database/types').DatabaseConfig;
     // 原始entries数据（用于获取entry_id）
     originalEntries?: any[];
 }

@@ -1,12 +1,13 @@
 import { WriteEntryOptions, WriteCompactedEntryOptions } from './types';
 import { WriteEntryToFile, WriteCompactedEntryToFile } from './localfile/writer';
+import { WriteEntryToDatabase, WriteCompactedEntryToDatabase } from './database/writer';
 
 /**
  * 作用：写入entry数据的统一入口
  * 关联：被loop模块、compact模块调用，用于存储用户输入、AI响应、tool结果等
  * 预期结果：根据存储类型调用对应的writer实现
  */
-export function WriteEntry(options: WriteEntryOptions): void {
+export async function WriteEntry(options: WriteEntryOptions): Promise<void> {
     // 参数有效性检查
     if (!options.storageType) {
         throw new Error('storageType is required');
@@ -26,7 +27,18 @@ export function WriteEntry(options: WriteEntryOptions): void {
             WriteEntryToFile(options);
             break;
         case 'database':
-            WriteEntryToDatabase(options);
+            if (!options.databaseConfig) {
+                throw new Error('databaseConfig is required when storageType is database');
+            }
+            await WriteEntryToDatabase({
+                databaseConfig: options.databaseConfig,
+                sessionId: options.sessionId,
+                role: options.role,
+                content: options.content,
+                tools: options.tools,
+                tokenConsumption: options.tokenConsumption,
+                createAt: options.createAt
+            });
             break;
         default:
             throw new Error(`Unsupported storageType: ${options.storageType}`);
@@ -38,7 +50,7 @@ export function WriteEntry(options: WriteEntryOptions): void {
  * 关联：被compact模块调用，用于存储压缩后的摘要
  * 预期结果：根据存储类型调用对应的writer实现
  */
-export function WriteCompactedEntry(options: WriteCompactedEntryOptions): void {
+export async function WriteCompactedEntry(options: WriteCompactedEntryOptions): Promise<void> {
     // 参数有效性检查
     if (!options.storageType) {
         throw new Error('storageType is required');
@@ -62,27 +74,18 @@ export function WriteCompactedEntry(options: WriteCompactedEntryOptions): void {
             WriteCompactedEntryToFile(options);
             break;
         case 'database':
-            WriteCompactedEntryToDatabase(options);
+            if (!options.databaseConfig) {
+                throw new Error('databaseConfig is required when storageType is database');
+            }
+            await WriteCompactedEntryToDatabase({
+                databaseConfig: options.databaseConfig,
+                sessionId: options.sessionId,
+                summary: options.summary,
+                triggerEntryId: options.triggerEntryId,
+                createAt: options.createAt
+            });
             break;
         default:
             throw new Error(`Unsupported storageType: ${options.storageType}`);
     }
-}
-
-/**
- * 作用：将entry写入数据库
- * 关联：被WriteEntry调用
- * 预期结果：将entry数据插入数据库
- */
-function WriteEntryToDatabase(options: WriteEntryOptions): void {
-    // TODO: 实现数据库写入逻辑
-}
-
-/**
- * 作用：将压缩记录写入数据库
- * 关联：被WriteCompactedEntry调用
- * 预期结果：将压缩记录插入数据库
- */
-function WriteCompactedEntryToDatabase(options: WriteCompactedEntryOptions): void {
-    // TODO: 实现数据库写入逻辑
 }

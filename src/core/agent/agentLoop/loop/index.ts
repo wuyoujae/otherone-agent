@@ -27,11 +27,12 @@ export async function InvokeAgent(input: InputOptions, ai: AIOptions): Promise<a
 async function InvokeAgentNonStream(input: InputOptions, ai: AIOptions): Promise<any> {
     // 如果有userPrompt，先存储用户消息
     if (ai.userPrompt) {
-        WriteEntry({
+        await WriteEntry({
             storageType: input.storageType || 'localfile',
             sessionId: input.sessionId,
             role: 'user',
-            content: ai.userPrompt
+            content: ai.userPrompt,
+            databaseConfig: input.databaseConfig
         });
     }
     
@@ -54,7 +55,8 @@ async function InvokeAgentNonStream(input: InputOptions, ai: AIOptions): Promise
             thresholdPercentage: input.thresholdPercentage,
             ai: ai,
             systemPrompt: ai.systemPrompt,
-            tools: ai.tools
+            tools: ai.tools,
+            databaseConfig: input.databaseConfig
         });
         
         // 将历史消息添加到ai配置中
@@ -72,13 +74,14 @@ async function InvokeAgentNonStream(input: InputOptions, ai: AIOptions): Promise
         }
         
         // 存储AI响应到storage
-        WriteEntry({
+        await WriteEntry({
             storageType: input.storageType || 'localfile',
             sessionId: input.sessionId,
             role: parsedResponse.role,
             content: parsedResponse.content,
             tools: parsedResponse.tools,
-            tokenConsumption: parsedResponse.token_consumption
+            tokenConsumption: parsedResponse.token_consumption,
+            databaseConfig: input.databaseConfig
         });
         
         // 检查是否有tool调用
@@ -98,7 +101,7 @@ async function InvokeAgentNonStream(input: InputOptions, ai: AIOptions): Promise
                 const toolResultContent = JSON.stringify(toolResult.result || toolResult.error);
                 
                 // 存储单个tool结果（role为'tool'）
-                WriteEntry({
+                await WriteEntry({
                     storageType: input.storageType || 'localfile',
                     sessionId: input.sessionId,
                     role: 'tool',
@@ -108,7 +111,8 @@ async function InvokeAgentNonStream(input: InputOptions, ai: AIOptions): Promise
                         function_name: toolResult.function_name,
                         result: toolResult.result,
                         error: toolResult.error
-                    }
+                    },
+                    databaseConfig: input.databaseConfig
                 });
             }
             
@@ -134,11 +138,12 @@ async function InvokeAgentNonStream(input: InputOptions, ai: AIOptions): Promise
 async function* InvokeAgentStream(input: InputOptions, ai: AIOptions): AsyncGenerator<any, any, unknown> {
     // 如果有userPrompt，先存储用户消息
     if (ai.userPrompt) {
-        WriteEntry({
+        await WriteEntry({
             storageType: input.storageType || 'localfile',
             sessionId: input.sessionId,
             role: 'user',
-            content: ai.userPrompt
+            content: ai.userPrompt,
+            databaseConfig: input.databaseConfig
         });
     }
     
@@ -162,7 +167,8 @@ async function* InvokeAgentStream(input: InputOptions, ai: AIOptions): AsyncGene
                 thresholdPercentage: input.thresholdPercentage,
                 ai: ai,
                 systemPrompt: ai.systemPrompt,
-                tools: ai.tools
+                tools: ai.tools,
+                databaseConfig: input.databaseConfig
             });
             
             // 将历史消息添加到ai配置中
@@ -255,13 +261,14 @@ async function* InvokeAgentStream(input: InputOptions, ai: AIOptions): AsyncGene
                 }
                 
                 // 存储AI响应到storage
-                WriteEntry({
+                await WriteEntry({
                     storageType: input.storageType || 'localfile',
                     sessionId: input.sessionId,
                     role: parsedResponse.role,
                     content: parsedResponse.content,
                     tools: parsedResponse.tools,
-                    tokenConsumption: parsedResponse.token_consumption
+                    tokenConsumption: parsedResponse.token_consumption,
+                    databaseConfig: input.databaseConfig
                 });
                 
                 // 检查是否有tool调用
@@ -285,7 +292,7 @@ async function* InvokeAgentStream(input: InputOptions, ai: AIOptions): AsyncGene
                         const toolResultContent = JSON.stringify(toolResult.result || toolResult.error);
                         
                         // 存储单个tool结果（role为'tool'）
-                        WriteEntry({
+                        await WriteEntry({
                             storageType: input.storageType || 'localfile',
                             sessionId: input.sessionId,
                             role: 'tool',
@@ -295,7 +302,8 @@ async function* InvokeAgentStream(input: InputOptions, ai: AIOptions): AsyncGene
                                 function_name: toolResult.function_name,
                                 result: toolResult.result,
                                 error: toolResult.error
-                            }
+                            },
+                            databaseConfig: input.databaseConfig
                         });
                     }
                     

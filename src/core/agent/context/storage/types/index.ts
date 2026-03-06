@@ -23,6 +23,8 @@ export interface WriteEntryOptions {
     tokenConsumption?: number;
     // 创建时间（可选，默认当前时间）
     createAt?: string;
+    // 数据库存储配置（当storageType为database时必填）
+    databaseConfig?: import('../database/types').DatabaseConfig;
 }
 
 // 写入压缩记录的参数类型
@@ -37,4 +39,6 @@ export interface WriteCompactedEntryOptions {
     triggerEntryId: string;
     // 创建时间（可选，默认当前时间）
     createAt?: string;
+    // 数据库存储配置（当storageType为database时必填）
+    databaseConfig?: import('../database/types').DatabaseConfig;
 }

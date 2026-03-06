@@ -1,5 +1,6 @@
 import { CombineContextOptions } from './types';
 import { ReadSessionData } from '../storage/localfile/reader';
+import { ReadSessionDataFromDatabase } from '../storage/database/reader';
 import { CheckThreshold } from '../compact/checkThreshold';
 import { EstimateTokens } from '../compact/estimateTokens';
 import { CompactMessages } from '../compact';
@@ -31,12 +32,10 @@ export async function CombineContext(options: CombineContextOptions): Promise<an
     let sessionData: any;
     switch (options.loadType) {
         case 'database':
-            // TODO: 实现从数据库加载逻辑
-            sessionData = {
-                session: {},
-                entries: [],
-                compacted_entries: []
-            };
+            if (!options.databaseConfig) {
+                throw new Error('databaseConfig is required when loadType is database');
+            }
+            sessionData = await ReadSessionDataFromDatabase(options.sessionId, options.databaseConfig);
             break;
         case 'localfile':
             sessionData = ReadSessionData(options.sessionId);
@@ -157,6 +156,7 @@ export async function CombineContext(options: CombineContextOptions): Promise<an
             hasCompactedContent: hasCompactedContent,
             sessionId: options.sessionId,
             storageType: options.loadType,
+            databaseConfig: options.databaseConfig,
             originalEntries: sessionData.entries
         });
         

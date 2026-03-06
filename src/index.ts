@@ -22,6 +22,12 @@ import { EstimateTokens } from './core/agent/context/compact/estimateTokens';
 import { WriteEntry, WriteCompactedEntry } from './core/agent/context/storage';
 import { ReadSessionData, ReadStorageFile, GetAllSessions } from './core/agent/context/storage/localfile/reader';
 import { CreateNewSession } from './core/agent/context/storage/localfile/writer';
+import {
+    InitDatabase,
+    CreateNewSessionInDatabase,
+    GetAllSessionsFromDatabase,
+    ReadSessionDataFromDatabase
+} from './core/agent/context/storage/database';
 
 /**
  * 作用：veloca核心对象，封装所有公开API
@@ -67,7 +73,12 @@ export const veloca = {
     ReadSessionData,
     ReadStorageFile,
     GetAllSessions,
-    CreateNewSession
+    CreateNewSession,
+    // 数据库存储方法
+    InitDatabase,
+    CreateNewSessionInDatabase,
+    GetAllSessionsFromDatabase,
+    ReadSessionDataFromDatabase
 };
 
 // 导出类型定义
@@ -112,6 +123,8 @@ export type {
     StorageType as StorageTypeEnum
 } from './core/agent/context/storage/types';
 
+export type { DatabaseConfig } from './core/agent/context/storage/database/types';
+
 export type {
     ToolsOptions
 } from './core/agent/tools/types';
@@ -131,7 +144,11 @@ export {
     ReadSessionData,
     ReadStorageFile,
     GetAllSessions,
-    CreateNewSession
+    CreateNewSession,
+    InitDatabase,
+    CreateNewSessionInDatabase,
+    GetAllSessionsFromDatabase,
+    ReadSessionDataFromDatabase
 };
 
 // 默认导出veloca对象

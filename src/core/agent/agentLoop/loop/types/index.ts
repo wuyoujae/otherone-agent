@@ -21,6 +21,8 @@ export interface InputOptions {
     contextLoadType: ContextLoadType;
     // 存储类型（可选，默认localfile）
     storageType?: StorageType;
+    // 数据库存储配置（当storageType为database或contextLoadType为database时必填）
+    databaseConfig?: import('../../../context/storage/database/types').DatabaseConfig;
     // 模型的上下文窗口大小
     contextWindow: number;
     // 触发压缩的阈值百分比（默认0.8，即80%）

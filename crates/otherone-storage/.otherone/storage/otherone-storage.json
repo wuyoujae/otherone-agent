@@ -1,0 +1,11 @@
+{
+  "sessions": [
+    {
+      "session_id": "0b0821d0-f613-406b-883a-1b5a42221498",
+      "status": 0,
+      "create_at": "2026-06-27T12:49:48.540984700+00:00",
+      "entries": [],
+      "compacted_entries": []
+    }
+  ]
+}

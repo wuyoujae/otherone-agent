@@ -1,0 +1,26 @@
+[package]
+name = "otherone-agent"
+version = "0.2.0"
+edition = "2021"
+license = "MIT"
+readme = "../../README.md"
+documentation = "https://docs.rs/otherone-agent"
+repository = "https://github.com/wuyoujae/otherone-agent"
+keywords = ["ai", "agent", "llm"]
+categories = ["asynchronous"]
+description = "Agent 循环驱动 — 核心 Agent 主循环，支持流式和非流式响应"
+
+[dependencies]
+tokio = { workspace = true }
+async-trait = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+futures = { workspace = true }
+otherone-ai = { version = "0.2.0", path = "../otherone-ai" }
+otherone-context = { version = "0.2.0", path = "../otherone-context" }
+otherone-memory = { version = "0.2.0", path = "../otherone-memory" }
+otherone-tools = { version = "0.2.0", path = "../otherone-tools" }
+otherone-storage = { version = "0.2.0", path = "../otherone-storage" }

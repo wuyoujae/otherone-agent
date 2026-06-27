@@ -4,6 +4,7 @@
 
 use otherone_storage::types::DatabaseConfig;
 use serde::{Deserialize, Serialize};
+use tokio::sync::mpsc;
 
 /// Context 加载类型
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -80,4 +81,29 @@ pub struct AiOptions {
     pub stream: Option<bool>,
     /// 其他兼容参数
     pub other: Option<serde_json::Value>,
+}
+
+/// 流式 Agent 事件类型
+#[derive(Debug, Clone)]
+pub struct StreamAgentEvent {
+    /// 事件类型: "chunk" | "thinking" | "tool_calls" | "queued_user_prompts" | "complete" | "error"
+    pub event_type: String,
+    /// 事件内容
+    pub content: String,
+    /// 原始 chunk 数据（当 event_type 为 "chunk" 时）
+    pub raw_chunk: Option<serde_json::Value>,
+    /// 错误信息（当 event_type 为 "error" 时）
+    pub error: Option<String>,
+}
+
+/// 运行中的流式 Agent 命令
+#[derive(Debug, Clone)]
+pub enum AgentStreamCommand {
+    EnqueueUserPrompts(Vec<String>),
+}
+
+/// 可交互的流式 Agent 句柄
+pub struct AgentStreamHandle {
+    pub events: mpsc::Receiver<StreamAgentEvent>,
+    pub commands: mpsc::Sender<AgentStreamCommand>,
 }

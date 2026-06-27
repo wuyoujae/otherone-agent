@@ -3,7 +3,7 @@
 // 预期结果：提供统一的 Otherone struct，封装所有 Agent 框架功能
 
 use otherone_agent::types::{AiOptions, InputOptions};
-use otherone_agent::StreamAgentEvent;
+use otherone_agent::{AgentStreamHandle, StreamAgentEvent};
 use otherone_ai::types::ProviderType;
 use tokio::sync::mpsc;
 
@@ -49,6 +49,16 @@ impl Otherone {
         auxiliary_ai: Option<AiOptions>,
     ) -> Result<mpsc::Receiver<StreamAgentEvent>, otherone_agent::error::AgentError> {
         otherone_agent::invoke_agent_stream(input, ai, auxiliary_ai).await
+    }
+
+    /// 调用 Agent（可交互流式）
+    /// 作用：返回事件接收器和运行中命令发送器，允许调用方在安全边界追加用户消息
+    pub async fn invoke_agent_stream_interactive(
+        input: InputOptions,
+        ai: AiOptions,
+        auxiliary_ai: Option<AiOptions>,
+    ) -> Result<AgentStreamHandle, otherone_agent::error::AgentError> {
+        otherone_agent::invoke_agent_stream_interactive(input, ai, auxiliary_ai).await
     }
 
     /// 调用 AI 模型（不经过 Agent 循环）

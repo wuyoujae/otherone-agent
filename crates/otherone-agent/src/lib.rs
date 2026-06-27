@@ -7,7 +7,7 @@ pub mod response_parser;
 pub mod types;
 
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Duration;
 use tokio::sync::mpsc;
@@ -20,6 +20,8 @@ use crate::types::{
     StorageType as AgentStorageType,
 };
 use otherone_storage::types::{StorageType, WriteEntryOptions};
+
+pub use crate::types::{AgentStreamCommand, AgentStreamHandle, StreamAgentEvent};
 
 const LONG_TERM_MEMORY_TOOL_NAME: &str = "otherone_add_long_term_memory";
 const LONG_TERM_MEMORY_RECALL_TOOL_NAME: &str = "otherone_recall_long_term_memory";
@@ -139,36 +141,34 @@ struct LongTermMemoryCommitArgs {
     parent_types: Option<String>,
 }
 
-/// 流式 Agent 事件类型
-/// 作用：定义流式 Agent 循环中 yield 给调用者的事件
-/// 关联：被 invoke_agent_stream 使用
-/// 预期结果：调用者可以根据 event_type 区分不同的事件
-#[derive(Debug, Clone)]
-pub struct StreamAgentEvent {
-    /// 事件类型: "chunk" | "thinking" | "tool_calls" | "complete" | "error"
-    pub event_type: String,
-    /// 事件内容
-    pub content: String,
-    /// 原始 chunk 数据（当 event_type 为 "chunk" 时）
-    pub raw_chunk: Option<serde_json::Value>,
-    /// 错误信息（当 event_type 为 "error" 时）
-    pub error: Option<String>,
-}
-
 /// 流式 Agent 调用
 /// 作用：启动流式 Agent 循环，通过 mpsc channel 实时发送事件
 /// 关联：被 otherone 主 crate 的 Otherone::invoke_agent_stream 调用
 /// 预期结果：返回 mpsc Receiver，调用者可以异步迭代接收事件
 pub async fn invoke_agent_stream(
     input: InputOptions,
-    mut ai: AiOptions,
+    ai: AiOptions,
     auxiliary_ai: Option<AiOptions>,
 ) -> Result<mpsc::Receiver<StreamAgentEvent>, AgentError> {
+    let handle = invoke_agent_stream_interactive(input, ai, auxiliary_ai).await?;
+    Ok(handle.events)
+}
+
+/// 可交互的流式 Agent 调用
+/// 作用：启动流式 Agent 循环，并返回事件接收器和运行中命令发送器
+pub async fn invoke_agent_stream_interactive(
+    input: InputOptions,
+    mut ai: AiOptions,
+    auxiliary_ai: Option<AiOptions>,
+) -> Result<AgentStreamHandle, AgentError> {
     let (tx, rx) = mpsc::channel::<StreamAgentEvent>(256);
+    let (command_tx, command_rx) = mpsc::channel::<AgentStreamCommand>(256);
 
     tokio::spawn(async move {
         let mut auxiliary_ai = auxiliary_ai;
-        if let Err(e) = run_stream_loop(input, &mut ai, auxiliary_ai.as_mut(), &tx).await {
+        if let Err(e) =
+            run_stream_loop(input, &mut ai, auxiliary_ai.as_mut(), &tx, command_rx).await
+        {
             let _ = tx
                 .send(StreamAgentEvent {
                     event_type: "error".to_string(),
@@ -180,7 +180,80 @@ pub async fn invoke_agent_stream(
         }
     });
 
-    Ok(rx)
+    Ok(AgentStreamHandle {
+        events: rx,
+        commands: command_tx,
+    })
+}
+
+fn drain_agent_commands(
+    command_rx: &mut mpsc::Receiver<AgentStreamCommand>,
+    queued_prompts: &mut VecDeque<String>,
+) {
+    loop {
+        match command_rx.try_recv() {
+            Ok(AgentStreamCommand::EnqueueUserPrompts(prompts)) => {
+                for prompt in prompts {
+                    let prompt = prompt.trim();
+                    if !prompt.is_empty() {
+                        queued_prompts.push_back(prompt.to_string());
+                    }
+                }
+            }
+            Err(mpsc::error::TryRecvError::Empty)
+            | Err(mpsc::error::TryRecvError::Disconnected) => break,
+        }
+    }
+}
+
+async fn write_user_prompt_entry(
+    input: &InputOptions,
+    storage_type: &StorageType,
+    prompt: &str,
+) -> Result<(), AgentError> {
+    otherone_storage::write_entry(&WriteEntryOptions {
+        storage_type: storage_type.clone(),
+        session_id: input.session_id.clone(),
+        role: "user".to_string(),
+        content: prompt.to_string(),
+        tools: None,
+        token_consumption: None,
+        create_at: None,
+        database_config: input.database_config.clone(),
+    })
+    .await
+    .map_err(|e| AgentError::ContextError(e.to_string()))
+}
+
+async fn write_queued_user_prompts(
+    input: &InputOptions,
+    storage_type: &StorageType,
+    queued_prompts: &mut VecDeque<String>,
+) -> Result<usize, AgentError> {
+    let mut written = 0usize;
+
+    while let Some(prompt) = queued_prompts.front().cloned() {
+        write_user_prompt_entry(input, storage_type, &prompt).await?;
+        queued_prompts.pop_front();
+        written += 1;
+    }
+
+    Ok(written)
+}
+
+async fn emit_queued_user_prompts(tx: &mpsc::Sender<StreamAgentEvent>, count: usize) {
+    if count == 0 {
+        return;
+    }
+
+    let _ = tx
+        .send(StreamAgentEvent {
+            event_type: "queued_user_prompts".to_string(),
+            content: count.to_string(),
+            raw_chunk: None,
+            error: None,
+        })
+        .await;
 }
 
 /// 流式循环实际逻辑
@@ -192,6 +265,7 @@ async fn run_stream_loop(
     ai: &mut AiOptions,
     auxiliary_ai: Option<&mut AiOptions>,
     tx: &mpsc::Sender<StreamAgentEvent>,
+    mut command_rx: mpsc::Receiver<AgentStreamCommand>,
 ) -> Result<(), AgentError> {
     let long_term_memory_enabled = input.enable_long_term_memory.unwrap_or(false);
     let memory_queue = if long_term_memory_enabled {
@@ -220,26 +294,20 @@ async fn run_stream_loop(
 
     // 存储用户消息
     if let Some(ref user_prompt) = ai.user_prompt {
-        otherone_storage::write_entry(&WriteEntryOptions {
-            storage_type: storage_type.clone(),
-            session_id: input.session_id.clone(),
-            role: "user".to_string(),
-            content: user_prompt.clone(),
-            tools: None,
-            token_consumption: None,
-            create_at: None,
-            database_config: input.database_config.clone(),
-        })
-        .await
-        .map_err(|e| AgentError::ContextError(e.to_string()))?;
+        write_user_prompt_entry(&input, &storage_type, user_prompt).await?;
     }
 
     let max_iterations = input.max_iterations.unwrap_or(999999);
     let mut iteration: u32 = 0;
     let mut long_term_memory_activity = false;
+    let mut queued_prompts = VecDeque::new();
 
     while iteration < max_iterations {
         iteration += 1;
+
+        drain_agent_commands(&mut command_rx, &mut queued_prompts);
+        let written = write_queued_user_prompts(&input, &storage_type, &mut queued_prompts).await?;
+        emit_queued_user_prompts(tx, written).await;
 
         // 组合 tools 配置
         let tools = otherone_tools::combine_tools(ai.tools.clone());
@@ -444,9 +512,21 @@ async fn run_stream_loop(
 
                 spawn_drained_long_term_memory_processing(&memory_queue, &memory_model_config);
 
+                drain_agent_commands(&mut command_rx, &mut queued_prompts);
+                let written =
+                    write_queued_user_prompts(&input, &storage_type, &mut queued_prompts).await?;
+                emit_queued_user_prompts(tx, written).await;
+
                 tokio::time::sleep(Duration::from_millis(1500)).await;
                 continue;
             }
+        }
+
+        drain_agent_commands(&mut command_rx, &mut queued_prompts);
+        let written = write_queued_user_prompts(&input, &storage_type, &mut queued_prompts).await?;
+        if written > 0 {
+            emit_queued_user_prompts(tx, written).await;
+            continue;
         }
 
         // 发送完成事件

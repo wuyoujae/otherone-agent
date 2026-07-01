@@ -1776,7 +1776,7 @@ dependencies = [
 
 [[package]]
 name = "otherone"
-version = "0.2.0"
+version = "0.4.0"
 dependencies = [
  "otherone-agent",
  "otherone-ai",
@@ -1792,7 +1792,7 @@ dependencies = [
 
 [[package]]
 name = "otherone-agent"
-version = "0.2.0"
+version = "0.4.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1811,7 +1811,7 @@ dependencies = [
 
 [[package]]
 name = "otherone-ai"
-version = "0.2.0"
+version = "0.4.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1828,7 +1828,7 @@ dependencies = [
 
 [[package]]
 name = "otherone-context"
-version = "0.2.0"
+version = "0.4.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1842,7 +1842,7 @@ dependencies = [
 
 [[package]]
 name = "otherone-mcp"
-version = "0.2.0"
+version = "0.4.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1857,7 +1857,7 @@ dependencies = [
 
 [[package]]
 name = "otherone-memory"
-version = "0.2.0"
+version = "0.4.0"
 dependencies = [
  "chrono",
  "serde",
@@ -1868,7 +1868,7 @@ dependencies = [
 
 [[package]]
 name = "otherone-skills"
-version = "0.2.0"
+version = "0.4.0"
 dependencies = [
  "anyhow",
  "serde",
@@ -1879,7 +1879,7 @@ dependencies = [
 
 [[package]]
 name = "otherone-storage"
-version = "0.2.0"
+version = "0.4.0"
 dependencies = [
  "aes-gcm",
  "anyhow",
@@ -1900,7 +1900,7 @@ dependencies = [
 
 [[package]]
 name = "otherone-tools"
-version = "0.2.0"
+version = "0.4.0"
 dependencies = [
  "anyhow",
  "otherone-ai",

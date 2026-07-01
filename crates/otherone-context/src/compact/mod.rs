@@ -14,7 +14,7 @@ use crate::compact::prompts::{
 };
 use crate::error::ContextError;
 use otherone_ai::types::{Message, MessageContent, ProviderType};
-use otherone_storage::types::{StorageType, WriteCompactedEntryOptions};
+use otherone_storage::types::{RuntimeContext, StorageType, WriteCompactedEntryOptions};
 
 /// 压缩上下文消息
 /// 作用：保留最新的消息，压缩旧的消息为一段摘要
@@ -31,6 +31,35 @@ pub async fn compact_messages(
     storage_type: Option<&StorageType>,
     database_config: Option<&otherone_storage::types::DatabaseConfig>,
     original_entries: Option<&[otherone_storage::types::Entry]>,
+) -> Result<Vec<Message>, ContextError> {
+    compact_messages_with_context(
+        messages,
+        _context_tokens,
+        context_window,
+        compact_ratio,
+        ai_config,
+        has_compacted_content,
+        session_id,
+        storage_type,
+        database_config,
+        original_entries,
+        None,
+    )
+    .await
+}
+
+pub async fn compact_messages_with_context(
+    messages: &[Message],
+    _context_tokens: u32,
+    context_window: u32,
+    compact_ratio: Option<f32>,
+    ai_config: Option<&serde_json::Value>,
+    has_compacted_content: bool,
+    session_id: Option<&str>,
+    storage_type: Option<&StorageType>,
+    database_config: Option<&otherone_storage::types::DatabaseConfig>,
+    original_entries: Option<&[otherone_storage::types::Entry]>,
+    runtime_context: Option<&RuntimeContext>,
 ) -> Result<Vec<Message>, ContextError> {
     if messages.is_empty() {
         return Ok(Vec::new());
@@ -123,6 +152,8 @@ pub async fn compact_messages(
                 trigger_entry_id,
                 create_at: None,
                 database_config: database_config.cloned(),
+                runtime_context: runtime_context.cloned(),
+                metadata: Default::default(),
             })
             .await;
         }

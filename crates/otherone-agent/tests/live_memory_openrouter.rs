@@ -34,6 +34,7 @@ fn agent_input(session_id: &str) -> InputOptions {
         context_load_type: ContextLoadType::LocalFile,
         storage_type: Some(StorageType::LocalFile),
         database_config: None,
+        runtime_context: None,
         context_window: 1_000_000,
         threshold_percentage: None,
         max_iterations: Some(6),

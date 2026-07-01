@@ -220,6 +220,8 @@ async fn write_user_prompt_entry(
         token_consumption: None,
         create_at: None,
         database_config: input.database_config.clone(),
+        runtime_context: input.runtime_context.clone(),
+        metadata: Default::default(),
     })
     .await
     .map_err(|e| AgentError::ContextError(e.to_string()))
@@ -330,6 +332,7 @@ async fn run_stream_loop(
                 system_prompt: ai.system_prompt.clone(),
                 tools: ai.tools.clone(),
                 database_config: input.database_config.clone(),
+                runtime_context: input.runtime_context.clone(),
             })
             .await
             .map_err(|e| AgentError::ContextError(e.to_string()))?;
@@ -440,6 +443,8 @@ async fn run_stream_loop(
             token_consumption: Some(token_consumption),
             create_at: None,
             database_config: input.database_config.clone(),
+            runtime_context: input.runtime_context.clone(),
+            metadata: Default::default(),
         })
         .await
         .map_err(|e| AgentError::ContextError(e.to_string()))?;
@@ -505,6 +510,8 @@ async fn run_stream_loop(
                         token_consumption: None,
                         create_at: None,
                         database_config: input.database_config.clone(),
+                        runtime_context: input.runtime_context.clone(),
+                        metadata: Default::default(),
                     })
                     .await
                     .map_err(|e| AgentError::ContextError(e.to_string()))?;
@@ -671,6 +678,8 @@ pub async fn invoke_agent(
             token_consumption: None,
             create_at: None,
             database_config: input.database_config.clone(),
+            runtime_context: input.runtime_context.clone(),
+            metadata: Default::default(),
         })
         .await
         .map_err(|e| AgentError::ContextError(e.to_string()))?;
@@ -705,6 +714,7 @@ pub async fn invoke_agent(
                 system_prompt: ai.system_prompt.clone(),
                 tools: ai.tools.clone(),
                 database_config: input.database_config.clone(),
+                runtime_context: input.runtime_context.clone(),
             })
             .await
             .map_err(|e| AgentError::ContextError(e.to_string()))?;
@@ -734,6 +744,8 @@ pub async fn invoke_agent(
             token_consumption: Some(parsed.token_consumption),
             create_at: None,
             database_config: input.database_config.clone(),
+            runtime_context: input.runtime_context.clone(),
+            metadata: Default::default(),
         })
         .await
         .map_err(|e| AgentError::ContextError(e.to_string()))?;
@@ -796,6 +808,8 @@ pub async fn invoke_agent(
                         token_consumption: None,
                         create_at: None,
                         database_config: input.database_config.clone(),
+                        runtime_context: input.runtime_context.clone(),
+                        metadata: Default::default(),
                     })
                     .await
                     .map_err(|e| AgentError::ContextError(e.to_string()))?;

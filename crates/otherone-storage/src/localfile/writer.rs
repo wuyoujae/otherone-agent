@@ -19,9 +19,12 @@ pub fn create_new_session() -> Result<String, StorageError> {
     let session_id = Uuid::new_v4().to_string();
 
     let new_session = StorageSession {
+        partition_key: None,
         session_id: session_id.clone(),
         status: 0,
         create_at: Utc::now().to_rfc3339(),
+        attributes: Default::default(),
+        metadata: Default::default(),
         entries: Vec::new(),
         compacted_entries: Vec::new(),
     };
@@ -56,6 +59,7 @@ pub fn write_entry_to_file(
         Some(s) => {
             let entry_id = Uuid::new_v4().to_string();
             let new_entry = crate::types::Entry {
+                partition_key: None,
                 entry_id,
                 session_id: session_id.to_string(),
                 content: content.to_string(),
@@ -67,12 +71,15 @@ pub fn write_entry_to_file(
                     .map(|s| s.to_string())
                     .unwrap_or_else(|| Utc::now().to_rfc3339()),
                 is_compaction: 1,
+                attributes: Default::default(),
+                metadata: Default::default(),
             };
             s.entries.push(new_entry);
         }
         None => {
             let entry_id = Uuid::new_v4().to_string();
             let new_entry = crate::types::Entry {
+                partition_key: None,
                 entry_id,
                 session_id: session_id.to_string(),
                 content: content.to_string(),
@@ -84,12 +91,17 @@ pub fn write_entry_to_file(
                     .map(|s| s.to_string())
                     .unwrap_or_else(|| Utc::now().to_rfc3339()),
                 is_compaction: 1,
+                attributes: Default::default(),
+                metadata: Default::default(),
             };
 
             let new_session = StorageSession {
+                partition_key: None,
                 session_id: session_id.to_string(),
                 status: 0,
                 create_at: Utc::now().to_rfc3339(),
+                attributes: Default::default(),
+                metadata: Default::default(),
                 entries: vec![new_entry],
                 compacted_entries: Vec::new(),
             };
@@ -120,6 +132,7 @@ pub fn write_compacted_entry_to_file(
 
     let entry_id = Uuid::new_v4().to_string();
     let new_compacted = crate::types::CompactedEntry {
+        partition_key: None,
         entry_id,
         session_id: session_id.to_string(),
         trigger_entry_id: trigger_entry_id.to_string(),
@@ -128,6 +141,8 @@ pub fn write_compacted_entry_to_file(
             .map(|s| s.to_string())
             .unwrap_or_else(|| Utc::now().to_rfc3339()),
         status: 0,
+        attributes: Default::default(),
+        metadata: Default::default(),
     };
 
     match session {
@@ -136,9 +151,12 @@ pub fn write_compacted_entry_to_file(
         }
         None => {
             let new_session = StorageSession {
+                partition_key: None,
                 session_id: session_id.to_string(),
                 status: 0,
                 create_at: Utc::now().to_rfc3339(),
+                attributes: Default::default(),
+                metadata: Default::default(),
                 entries: Vec::new(),
                 compacted_entries: vec![new_compacted],
             };

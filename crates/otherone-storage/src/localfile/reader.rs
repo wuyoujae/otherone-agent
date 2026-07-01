@@ -95,9 +95,12 @@ pub fn get_all_sessions() -> Result<Vec<Session>, crate::error::StorageError> {
         .sessions
         .iter()
         .map(|s| Session {
+            partition_key: s.partition_key.clone(),
             session_id: s.session_id.clone(),
             status: s.status,
             create_at: s.create_at.clone(),
+            attributes: s.attributes.clone(),
+            metadata: s.metadata.clone(),
         })
         .collect();
 
@@ -131,9 +134,12 @@ pub fn read_session_data(session_id: &str) -> Result<SessionData, crate::error::
         }),
         Some(s) => Ok(SessionData {
             session: Some(Session {
+                partition_key: s.partition_key.clone(),
                 session_id: s.session_id.clone(),
                 status: s.status,
                 create_at: s.create_at.clone(),
+                attributes: s.attributes.clone(),
+                metadata: s.metadata.clone(),
             }),
             entries: s.entries.clone(),
             compacted_entries: s.compacted_entries.clone(),

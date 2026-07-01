@@ -1,31 +1,41 @@
-// 作用：PostgreSQL 数据库写入操作
-// 关联：被 storage/lib.rs 调用
-// 预期结果：将 entry 和 compacted_entry 数据写入 PostgreSQL 数据库
-
 use chrono::Utc;
 use uuid::Uuid;
 
 use crate::error::StorageError;
-use crate::types::DatabaseConfig;
+use crate::types::{AttributeBag, DatabaseConfig, RuntimeContext};
 
 use super::client::create_database_client;
 
-/// 在数据库中创建新会话
-/// 作用：生成新的 session_id 并插入 otherone_session 表
-/// 关联：被用户调用，用于开始新的对话会话
-/// 预期结果：返回新生成的 session_id
 pub async fn create_new_session_in_database(
     config: &DatabaseConfig,
 ) -> Result<String, StorageError> {
-    let pool = create_database_client(config).await?;
+    create_new_session_in_database_with_context(config, &RuntimeContext::legacy_default()).await
+}
 
+pub async fn create_new_session_in_database_with_context(
+    config: &DatabaseConfig,
+    runtime_context: &RuntimeContext,
+) -> Result<String, StorageError> {
+    runtime_context
+        .validate()
+        .map_err(StorageError::ConfigError)?;
+
+    let pool = create_database_client(config).await?;
     let session_id = Uuid::new_v4().to_string();
+    let attributes_json = json_text(&runtime_context.attributes)?;
+    let metadata = AttributeBag::new();
+    let metadata_json = json_text(&metadata)?;
 
     sqlx::query(
-        "INSERT INTO otherone_session (session_id, status, create_at) VALUES ($1, $2, CURRENT_TIMESTAMP)",
+        "INSERT INTO otherone_session \
+         (partition_key, session_id, status, create_at, attributes_json, metadata_json) \
+         VALUES ($1, $2, $3, CURRENT_TIMESTAMP, $4, $5)",
     )
+    .bind(&runtime_context.partition_key)
     .bind(&session_id)
     .bind(0i16)
+    .bind(attributes_json)
+    .bind(metadata_json)
     .execute(&pool)
     .await?;
 
@@ -33,44 +43,52 @@ pub async fn create_new_session_in_database(
     Ok(session_id)
 }
 
-/// 将 entry 写入数据库
-/// 作用：将 entry 数据插入 otherone_entries 表
-/// 关联：被 storage/lib.rs 的 write_entry 调用
-/// 预期结果：entry 数据成功写入数据库
 pub async fn write_entry_to_database(
     config: &DatabaseConfig,
+    runtime_context: &RuntimeContext,
     session_id: &str,
     role: &str,
     content: &str,
     tools: Option<&serde_json::Value>,
     token_consumption: Option<u32>,
     create_at: Option<&str>,
+    metadata: &AttributeBag,
 ) -> Result<(), StorageError> {
+    runtime_context
+        .validate()
+        .map_err(StorageError::ConfigError)?;
+    if session_id.is_empty() {
+        return Err(StorageError::ConfigError(
+            "session_id is required".to_string(),
+        ));
+    }
+
     let pool = create_database_client(config).await?;
-
     let entry_id = Uuid::new_v4().to_string();
-    let create_at_dt = match create_at {
-        Some(s) => chrono::NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M:%S%.fZ")
-            .unwrap_or_else(|_| Utc::now().naive_utc()),
-        None => Utc::now().naive_utc(),
-    };
-    let tools_json = tools.map(|t| serde_json::to_string(t).unwrap_or_default());
+    let create_at_dt = parse_create_at(create_at);
+    let tools_json = tools.map(json_value_text).transpose()?;
+    let attributes_json = json_text(&runtime_context.attributes)?;
+    let metadata_json = json_text(metadata)?;
 
-    // 确保 session 存在（幂等 upsert）
     sqlx::query(
-        "INSERT INTO otherone_session (session_id, status, create_at) VALUES ($1, $2, CURRENT_TIMESTAMP) \
-         ON CONFLICT (session_id) DO NOTHING",
+        "INSERT INTO otherone_session \
+         (partition_key, session_id, status, create_at, attributes_json, metadata_json) \
+         VALUES ($1, $2, $3, CURRENT_TIMESTAMP, $4, '{}') \
+         ON CONFLICT (partition_key, session_id) DO NOTHING",
     )
+    .bind(&runtime_context.partition_key)
     .bind(session_id)
     .bind(0i16)
+    .bind(&attributes_json)
     .execute(&pool)
     .await?;
 
-    // 写入 entry
     sqlx::query(
-        "INSERT INTO otherone_entries (entry_id, session_id, content, role, token_consumption, status, tools, create_at, is_compaction) \
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
+        "INSERT INTO otherone_entries \
+         (partition_key, entry_id, session_id, content, role, token_consumption, status, tools, create_at, is_compaction, attributes_json, metadata_json) \
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)",
     )
+    .bind(&runtime_context.partition_key)
     .bind(&entry_id)
     .bind(session_id)
     .bind(content)
@@ -80,6 +98,8 @@ pub async fn write_entry_to_database(
     .bind(&tools_json)
     .bind(create_at_dt)
     .bind(1i16)
+    .bind(attributes_json)
+    .bind(metadata_json)
     .execute(&pool)
     .await?;
 
@@ -87,39 +107,63 @@ pub async fn write_entry_to_database(
     Ok(())
 }
 
-/// 将压缩记录写入数据库
-/// 作用：将压缩记录插入 otherone_compacted_entries 表
-/// 关联：被 storage/lib.rs 的 write_compacted_entry 调用
-/// 预期结果：压缩记录成功写入数据库
 pub async fn write_compacted_entry_to_database(
     config: &DatabaseConfig,
+    runtime_context: &RuntimeContext,
     session_id: &str,
     summary: &str,
     trigger_entry_id: &str,
     create_at: Option<&str>,
+    metadata: &AttributeBag,
 ) -> Result<(), StorageError> {
-    let pool = create_database_client(config).await?;
+    runtime_context
+        .validate()
+        .map_err(StorageError::ConfigError)?;
+    if session_id.is_empty() {
+        return Err(StorageError::ConfigError(
+            "session_id is required".to_string(),
+        ));
+    }
 
+    let pool = create_database_client(config).await?;
     let entry_id = Uuid::new_v4().to_string();
-    let create_at_dt = match create_at {
-        Some(s) => chrono::NaiveDateTime::parse_from_str(s, "%Y-%m-%dT%H:%M:%S%.fZ")
-            .unwrap_or_else(|_| Utc::now().naive_utc()),
-        None => Utc::now().naive_utc(),
-    };
+    let create_at_dt = parse_create_at(create_at);
+    let attributes_json = json_text(&runtime_context.attributes)?;
+    let metadata_json = json_text(metadata)?;
 
     sqlx::query(
-        "INSERT INTO otherone_compacted_entries (entry_id, session_id, trigger_entry_id, summary, create_at, status) \
-         VALUES ($1, $2, $3, $4, $5, $6)",
+        "INSERT INTO otherone_compacted_entries \
+         (partition_key, entry_id, session_id, trigger_entry_id, summary, create_at, status, attributes_json, metadata_json) \
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
     )
+    .bind(&runtime_context.partition_key)
     .bind(&entry_id)
     .bind(session_id)
     .bind(trigger_entry_id)
     .bind(summary)
     .bind(create_at_dt)
     .bind(0i16)
+    .bind(attributes_json)
+    .bind(metadata_json)
     .execute(&pool)
     .await?;
 
     pool.close().await;
     Ok(())
+}
+
+fn parse_create_at(create_at: Option<&str>) -> chrono::NaiveDateTime {
+    match create_at {
+        Some(value) => chrono::NaiveDateTime::parse_from_str(value, "%Y-%m-%dT%H:%M:%S%.fZ")
+            .unwrap_or_else(|_| Utc::now().naive_utc()),
+        None => Utc::now().naive_utc(),
+    }
+}
+
+fn json_text(value: &AttributeBag) -> Result<String, StorageError> {
+    serde_json::to_string(value).map_err(|error| StorageError::ConfigError(error.to_string()))
+}
+
+fn json_value_text(value: &serde_json::Value) -> Result<String, StorageError> {
+    serde_json::to_string(value).map_err(|error| StorageError::ConfigError(error.to_string()))
 }

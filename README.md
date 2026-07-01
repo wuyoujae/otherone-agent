@@ -20,7 +20,7 @@ Use the facade crate in another Rust project:
 
 ```toml
 [dependencies]
-otherone = "0.2.0"
+otherone = "0.4.0"
 ```
 
 During local development, depend on the workspace path:
@@ -45,6 +45,7 @@ async fn main() -> anyhow::Result<()> {
         session_id: "demo".to_string(),
         context_load_type: ContextLoadType::LocalFile,
         storage_type: None,
+        runtime_context: None,
         context_window: 8192,
         threshold_percentage: Some(0.8),
         max_iterations: Some(8),

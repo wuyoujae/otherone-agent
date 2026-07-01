@@ -1,10 +1,103 @@
-// 作用：定义 storage 模块的类型
-// 关联：被 storage/lib.rs、localfile、database 模块使用
-// 预期结果：提供存储相关的类型定义
-
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 
-/// 存储类型
+pub type AttributeBag = BTreeMap<String, serde_json::Value>;
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct RuntimeContext {
+    pub partition_key: String,
+    #[serde(default)]
+    pub attributes: AttributeBag,
+}
+
+impl RuntimeContext {
+    pub fn new(partition_key: impl Into<String>) -> Self {
+        Self {
+            partition_key: partition_key.into(),
+            attributes: AttributeBag::new(),
+        }
+    }
+
+    pub fn legacy_default() -> Self {
+        Self::new("default")
+    }
+
+    pub fn with_attribute(mut self, key: impl Into<String>, value: serde_json::Value) -> Self {
+        self.attributes.insert(key.into(), value);
+        self
+    }
+
+    pub fn validate(&self) -> Result<(), String> {
+        let partition_key = self.partition_key.trim();
+        if partition_key.is_empty() {
+            return Err("partition_key is required".to_string());
+        }
+        if partition_key.len() > 256 {
+            return Err("partition_key is too long".to_string());
+        }
+        for (key, value) in &self.attributes {
+            validate_attribute_key(key)?;
+            validate_attribute_value(value)?;
+        }
+        Ok(())
+    }
+}
+
+pub fn empty_attribute_bag() -> AttributeBag {
+    AttributeBag::new()
+}
+
+pub fn is_attribute_bag_empty(value: &AttributeBag) -> bool {
+    value.is_empty()
+}
+
+fn validate_attribute_key(key: &str) -> Result<(), String> {
+    if key.is_empty() || key.len() > 64 {
+        return Err(format!("invalid attribute key: {key}"));
+    }
+    if !key
+        .chars()
+        .all(|ch| ch == '_' || ch.is_ascii_lowercase() || ch.is_ascii_digit())
+    {
+        return Err(format!("invalid attribute key: {key}"));
+    }
+    Ok(())
+}
+
+fn validate_attribute_value(value: &serde_json::Value) -> Result<(), String> {
+    match value {
+        serde_json::Value::Null | serde_json::Value::Bool(_) | serde_json::Value::Number(_) => {
+            Ok(())
+        }
+        serde_json::Value::String(value) => {
+            if value.len() > 2048 {
+                Err("attribute string value is too long".to_string())
+            } else {
+                Ok(())
+            }
+        }
+        serde_json::Value::Array(values) => {
+            if values.len() > 32 {
+                return Err("attribute array value is too long".to_string());
+            }
+            for value in values {
+                validate_attribute_value(value)?;
+            }
+            Ok(())
+        }
+        serde_json::Value::Object(values) => {
+            if values.len() > 64 {
+                return Err("attribute object value is too large".to_string());
+            }
+            for (key, value) in values {
+                validate_attribute_key(key)?;
+                validate_attribute_value(value)?;
+            }
+            Ok(())
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum StorageType {
@@ -15,14 +108,12 @@ pub enum StorageType {
     Mongodb,
 }
 
-/// 数据库类型（PostgreSQL 或 MySQL）
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum DatabaseType {
     Postgres,
     Mysql,
 }
 
-/// 数据库连接配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DatabaseConfig {
     pub host: String,
@@ -30,55 +121,41 @@ pub struct DatabaseConfig {
     pub database: String,
     pub user: String,
     pub password: String,
-    /// 连接池最大连接数（可选）
     pub max: Option<u32>,
-    /// 空闲连接超时毫秒（可选）
     pub idle_timeout_millis: Option<u64>,
-    /// 连接超时毫秒（可选）
     pub connection_timeout_millis: Option<u64>,
 }
 
-/// 写入 entry 的参数类型
 #[derive(Debug, Clone)]
 pub struct WriteEntryOptions {
-    /// 存储类型
     pub storage_type: StorageType,
-    /// 会话 ID
     pub session_id: String,
-    /// 角色类型
     pub role: String,
-    /// 消息内容
     pub content: String,
-    /// 工具相关信息（可选）
     pub tools: Option<serde_json::Value>,
-    /// token 消耗量（可选）
     pub token_consumption: Option<u32>,
-    /// 创建时间（可选，默认当前时间）
     pub create_at: Option<String>,
-    /// 数据库存储配置（当 storage_type 为 database 时必填）
     pub database_config: Option<DatabaseConfig>,
+    pub runtime_context: Option<RuntimeContext>,
+    pub metadata: AttributeBag,
 }
 
-/// 写入压缩记录的参数类型
 #[derive(Debug, Clone)]
 pub struct WriteCompactedEntryOptions {
-    /// 存储类型
     pub storage_type: StorageType,
-    /// 会话 ID
     pub session_id: String,
-    /// 压缩摘要内容
     pub summary: String,
-    /// 触发压缩的 entry_id
     pub trigger_entry_id: String,
-    /// 创建时间（可选，默认当前时间）
     pub create_at: Option<String>,
-    /// 数据库存储配置（当 storage_type 为 database 时必填）
     pub database_config: Option<DatabaseConfig>,
+    pub runtime_context: Option<RuntimeContext>,
+    pub metadata: AttributeBag,
 }
 
-/// Entry 数据模型
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Entry {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub partition_key: Option<String>,
     pub entry_id: String,
     pub session_id: String,
     pub content: String,
@@ -90,17 +167,25 @@ pub struct Entry {
     pub tools: Option<serde_json::Value>,
     pub create_at: String,
     pub is_compaction: i16,
+    #[serde(default, skip_serializing_if = "is_attribute_bag_empty")]
+    pub attributes: AttributeBag,
+    #[serde(default, skip_serializing_if = "is_attribute_bag_empty")]
+    pub metadata: AttributeBag,
 }
 
-/// Session 数据模型
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Session {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub partition_key: Option<String>,
     pub session_id: String,
     pub status: i16,
     pub create_at: String,
+    #[serde(default, skip_serializing_if = "is_attribute_bag_empty")]
+    pub attributes: AttributeBag,
+    #[serde(default, skip_serializing_if = "is_attribute_bag_empty")]
+    pub metadata: AttributeBag,
 }
 
-/// Session 完整数据（包含 entries 和 compacted_entries）
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SessionData {
     pub session: Option<Session>,
@@ -108,31 +193,67 @@ pub struct SessionData {
     pub compacted_entries: Vec<CompactedEntry>,
 }
 
-/// 压缩记录
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CompactedEntry {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub partition_key: Option<String>,
     pub entry_id: String,
     pub session_id: String,
     pub trigger_entry_id: String,
     pub summary: String,
     pub create_at: String,
     pub status: i16,
+    #[serde(default, skip_serializing_if = "is_attribute_bag_empty")]
+    pub attributes: AttributeBag,
+    #[serde(default, skip_serializing_if = "is_attribute_bag_empty")]
+    pub metadata: AttributeBag,
 }
 
-/// 本地存储文件结构
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StorageFile {
     pub sessions: Vec<StorageSession>,
 }
 
-/// 本地存储中的 session（嵌入 entries 和 compacted_entries）
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StorageSession {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub partition_key: Option<String>,
     pub session_id: String,
     pub status: i16,
     pub create_at: String,
+    #[serde(default, skip_serializing_if = "is_attribute_bag_empty")]
+    pub attributes: AttributeBag,
+    #[serde(default, skip_serializing_if = "is_attribute_bag_empty")]
+    pub metadata: AttributeBag,
     #[serde(default)]
     pub entries: Vec<Entry>,
     #[serde(default)]
     pub compacted_entries: Vec<CompactedEntry>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn runtime_context_accepts_arbitrary_business_attributes() {
+        let context = RuntimeContext::new("tenant:t1:workspace:w9")
+            .with_attribute("tenant_id", serde_json::json!("t1"))
+            .with_attribute("workspace_id", serde_json::json!("w9"))
+            .with_attribute("project_id", serde_json::json!("p3"));
+
+        assert!(context.validate().is_ok());
+        assert_eq!(
+            context.attributes.get("project_id"),
+            Some(&serde_json::json!("p3"))
+        );
+    }
+
+    #[test]
+    fn runtime_context_rejects_invalid_attribute_keys() {
+        let context =
+            RuntimeContext::new("user:u1").with_attribute("User Id", serde_json::json!("u1"));
+
+        assert!(context.validate().is_err());
+    }
 }

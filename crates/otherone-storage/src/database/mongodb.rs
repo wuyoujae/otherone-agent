@@ -5,7 +5,7 @@ use mongodb::{Client, Collection};
 use uuid::Uuid;
 
 use crate::error::StorageError;
-use crate::types::{Entry, Session, SessionData};
+use crate::types::{Entry, RuntimeContext, Session, SessionData};
 
 pub struct MongoClient {
     client: Client,
@@ -46,15 +46,21 @@ impl MongoClient {
 
     pub async fn write_entry(
         &self,
+        runtime_context: &RuntimeContext,
         session_id: &str,
         role: &str,
         content: &str,
         _tools: Option<&serde_json::Value>,
         token_consumption: Option<u32>,
     ) -> Result<(), StorageError> {
+        runtime_context
+            .validate()
+            .map_err(StorageError::ConfigError)?;
         let eid = Uuid::new_v4().to_string();
         self.ec()
             .insert_one(doc! {
+                "partition_key": &runtime_context.partition_key,
+                "attributes_json": serde_json::to_string(&runtime_context.attributes).unwrap_or_default(),
                 "entry_id":&eid,"session_id":session_id,"role":role,"content":content,
                 "token_consumption":token_consumption.map(|t| t as i32).unwrap_or(0),
                 "status":0i32,"create_at":chrono::Utc::now().to_rfc3339(),"is_compaction":1i32
@@ -77,9 +83,12 @@ impl MongoClient {
             .map_err(|e| StorageError::ConfigError(format!("MongoDB: {}", e)))?
         {
             sessions.push(Session {
+                partition_key: d.get_str("partition_key").ok().map(ToString::to_string),
                 session_id: d.get_str("session_id").unwrap_or("").into(),
                 status: d.get_i32("status").unwrap_or(0) as i16,
                 create_at: d.get_str("create_at").unwrap_or("").into(),
+                attributes: Default::default(),
+                metadata: Default::default(),
             });
         }
         Ok(sessions)
@@ -100,9 +109,12 @@ impl MongoClient {
                 })
             }
             Some(d) => Session {
+                partition_key: d.get_str("partition_key").ok().map(ToString::to_string),
                 session_id: d.get_str("session_id").unwrap_or("").into(),
                 status: d.get_i32("status").unwrap_or(0) as i16,
                 create_at: d.get_str("create_at").unwrap_or("").into(),
+                attributes: Default::default(),
+                metadata: Default::default(),
             },
         };
         let mut cursor = self
@@ -117,6 +129,7 @@ impl MongoClient {
             .map_err(|e| StorageError::ConfigError(format!("MongoDB: {}", e)))?
         {
             entries.push(Entry {
+                partition_key: d.get_str("partition_key").ok().map(ToString::to_string),
                 entry_id: d.get_str("entry_id").unwrap_or("").into(),
                 session_id: d.get_str("session_id").unwrap_or("").into(),
                 content: d.get_str("content").unwrap_or("").into(),
@@ -126,6 +139,8 @@ impl MongoClient {
                 tools: None,
                 create_at: d.get_str("create_at").unwrap_or("").into(),
                 is_compaction: d.get_i32("is_compaction").unwrap_or(1) as i16,
+                attributes: Default::default(),
+                metadata: Default::default(),
             });
         }
         Ok(SessionData {

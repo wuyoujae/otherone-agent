@@ -112,6 +112,17 @@ impl Otherone {
         otherone_storage::database::writer::create_new_session_in_database(config).await
     }
 
+    pub async fn create_new_session_in_database_with_context(
+        config: &otherone_storage::types::DatabaseConfig,
+        runtime_context: &otherone_storage::types::RuntimeContext,
+    ) -> Result<String, otherone_storage::error::StorageError> {
+        otherone_storage::database::writer::create_new_session_in_database_with_context(
+            config,
+            runtime_context,
+        )
+        .await
+    }
+
     /// 获取所有会话（本地文件）
     pub fn get_all_sessions(
     ) -> Result<Vec<otherone_storage::types::Session>, otherone_storage::error::StorageError> {
@@ -123,6 +134,17 @@ impl Otherone {
         config: &otherone_storage::types::DatabaseConfig,
     ) -> Result<Vec<otherone_storage::types::Session>, otherone_storage::error::StorageError> {
         otherone_storage::database::reader::get_all_sessions_from_database(config).await
+    }
+
+    pub async fn get_all_sessions_from_database_with_context(
+        config: &otherone_storage::types::DatabaseConfig,
+        runtime_context: &otherone_storage::types::RuntimeContext,
+    ) -> Result<Vec<otherone_storage::types::Session>, otherone_storage::error::StorageError> {
+        otherone_storage::database::reader::get_all_sessions_from_database_with_context(
+            config,
+            runtime_context,
+        )
+        .await
     }
 
     /// 读取会话数据（本地文件）
@@ -139,6 +161,19 @@ impl Otherone {
     ) -> Result<otherone_storage::types::SessionData, otherone_storage::error::StorageError> {
         otherone_storage::database::reader::read_session_data_from_database(session_id, config)
             .await
+    }
+
+    pub async fn read_session_data_from_database_with_context(
+        session_id: &str,
+        config: &otherone_storage::types::DatabaseConfig,
+        runtime_context: &otherone_storage::types::RuntimeContext,
+    ) -> Result<otherone_storage::types::SessionData, otherone_storage::error::StorageError> {
+        otherone_storage::database::reader::read_session_data_from_database_with_context(
+            session_id,
+            config,
+            runtime_context,
+        )
+        .await
     }
 
     /// 初始化数据库
@@ -205,7 +240,7 @@ pub use otherone_storage::database::mongodb;
 pub use otherone_storage::database::mysql;
 pub use otherone_storage::localfile::encrypt;
 pub use otherone_storage::redis;
-pub use otherone_storage::types::DatabaseConfig;
+pub use otherone_storage::types::{AttributeBag, DatabaseConfig, RuntimeContext};
 
 // 重新导出子模块
 pub mod ai {

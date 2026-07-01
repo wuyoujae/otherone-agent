@@ -9,7 +9,6 @@ pub mod types;
 use tracing::warn;
 
 use crate::compact::check_threshold::check_threshold;
-use crate::compact::compact_messages;
 use crate::compact::estimate_tokens::estimate_tokens;
 use crate::error::ContextError;
 use crate::types::{CombineContextOptions, ContextLoadType};
@@ -51,9 +50,15 @@ pub async fn combine_context(
                     "database_config is required when load_type is database".to_string(),
                 )
             })?;
-            otherone_storage::database::reader::read_session_data_from_database(
+            let runtime_context = options.runtime_context.as_ref().ok_or_else(|| {
+                ContextError::ConfigError(
+                    "runtime_context is required when load_type is database".to_string(),
+                )
+            })?;
+            otherone_storage::database::reader::read_session_data_from_database_with_context(
                 &options.session_id,
                 db_config,
+                runtime_context,
             )
             .await
             .map_err(|e| ContextError::StorageError(e.to_string()))?
@@ -174,7 +179,7 @@ pub async fn combine_context(
             ContextLoadType::LocalFile => otherone_storage::types::StorageType::LocalFile,
         };
 
-        match compact_messages(
+        match crate::compact::compact_messages_with_context(
             &final_messages,
             context_tokens,
             options.context_window,
@@ -185,6 +190,7 @@ pub async fn combine_context(
             Some(&storage_type),
             options.database_config.as_ref(),
             Some(&filtered_session.entries),
+            options.runtime_context.as_ref(),
         )
         .await
         {

@@ -1,6 +1,6 @@
 [package]
 name = "otherone-mcp"
-version = "0.4.0"
+version = "0.5.0"
 edition = "2021"
 license = "MIT"
 readme = "../../README.md"
@@ -19,4 +19,5 @@ async-trait = { workspace = true }
 thiserror = { workspace = true }
 anyhow = { workspace = true }
 tracing = { workspace = true }
-otherone-ai = { version = "0.4.0", path = "../otherone-ai" }
+otherone-ai = { version = "0.5.0", path = "../otherone-ai" }
+otherone-tools = { version = "0.5.0", path = "../otherone-tools" }

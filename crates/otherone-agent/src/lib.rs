@@ -3,6 +3,7 @@
 // 预期结果：根据 input 和 ai 配置，执行完整的 Agent 循环，返回最终响应
 
 pub mod error;
+pub mod multi_agent;
 pub mod response_parser;
 pub mod types;
 

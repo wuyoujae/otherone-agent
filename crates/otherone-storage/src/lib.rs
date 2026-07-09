@@ -34,6 +34,7 @@ pub async fn write_entry(options: &WriteEntryOptions) -> Result<(), StorageError
                 options.tools.as_ref(),
                 options.token_consumption,
                 options.create_at.as_deref(),
+                &options.metadata,
             )?;
             Ok(())
         }
@@ -117,6 +118,7 @@ pub async fn write_compacted_entry(
                 &options.summary,
                 &options.trigger_entry_id,
                 options.create_at.as_deref(),
+                &options.metadata,
             )?;
             Ok(())
         }

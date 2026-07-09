@@ -73,13 +73,14 @@ pub async fn write_entry_to_database(
     sqlx::query(
         "INSERT INTO otherone_session \
          (partition_key, session_id, status, create_at, attributes_json, metadata_json) \
-         VALUES ($1, $2, $3, CURRENT_TIMESTAMP, $4, '{}') \
+         VALUES ($1, $2, $3, CURRENT_TIMESTAMP, $4, $5) \
          ON CONFLICT (partition_key, session_id) DO NOTHING",
     )
     .bind(&runtime_context.partition_key)
     .bind(session_id)
     .bind(0i16)
     .bind(&attributes_json)
+    .bind(&metadata_json)
     .execute(&pool)
     .await?;
 

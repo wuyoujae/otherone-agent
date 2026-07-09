@@ -79,6 +79,53 @@ async fn main() -> anyhow::Result<()> {
 }
 ```
 
+## Multi-Agent Runtime
+
+Agent definitions are peers. The application selects an entry Agent for each root run, and allowed
+Agents may call each other through the built-in `otherone.call_agent` tool.
+
+```rust
+use otherone::{
+    ai::types::ProviderType, AgentDefinition, AgentRunRequest, AgentRuntime, ModelProfile,
+};
+
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
+    let model = ModelProfile::builder("default", ProviderType::OpenAI, "gpt-4o-mini")
+        .api_key(std::env::var("OPENAI_API_KEY")?)
+        .base_url("https://api.openai.com/v1")
+        .build()?;
+
+    let researcher = AgentDefinition::builder("researcher")
+        .description("Research one focused question and return evidence.")
+        .system_prompt("You are a focused research Agent.")
+        .build()?;
+
+    let coordinator = AgentDefinition::builder("coordinator")
+        .description("Coordinate work and integrate specialist results.")
+        .system_prompt("Delegate focused research when it improves the answer.")
+        .allow_agents(["researcher"])
+        .build()?;
+
+    let runtime = AgentRuntime::builder()
+        .register_model(model)
+        .register_agent(coordinator)
+        .register_agent(researcher)
+        .build()?;
+
+    let result = runtime
+        .run(AgentRunRequest::new("coordinator", "Compare the available approaches"))
+        .await?;
+
+    println!("{:?}", result.output);
+    Ok(())
+}
+```
+
+The runtime provides typed events, cancellation, per-root budgets, child-session isolation,
+Agent-call permissions, cycle protection, idempotency, async tools, Skills filtering, scoped memory,
+and MCP tool adapters. Existing `Otherone::invoke_agent*` APIs remain available for compatibility.
+
 ## Package And Publish
 
 Check package contents without publishing:

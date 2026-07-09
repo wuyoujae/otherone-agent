@@ -231,6 +231,7 @@ impl AnthropicClient {
         let event: serde_json::Value = serde_json::from_str(json_str)?;
 
         let event_type = event["type"].as_str().unwrap_or("");
+        let usage = extract_anthropic_stream_usage(&event);
 
         // Handle tool_use blocks in streaming
         if event_type == "content_block_start" || event_type == "content_block_delta" {
@@ -239,16 +240,19 @@ impl AnthropicClient {
                 .or_else(|| event.get("delta").and_then(|d| d["type"].as_str()))
                 .unwrap_or("");
 
-            if block_type == "tool_use" {
+            if block_type == "tool_use" || block_type == "input_json_delta" {
                 // Extract tool_use info
                 let tool_name = event["content_block"]["name"].as_str().unwrap_or("");
                 let tool_id = event["content_block"]["id"].as_str().unwrap_or("");
                 let partial_json = event["delta"]["partial_json"].as_str().unwrap_or("");
+                let index = event["index"]
+                    .as_u64()
+                    .and_then(|value| u32::try_from(value).ok());
 
                 // Build tool_call delta
                 let tool_calls = if !tool_name.is_empty() || !partial_json.is_empty() {
                     Some(vec![crate::types::ToolCall {
-                        index: None,
+                        index,
                         id: tool_id.to_string(),
                         call_type: "function".to_string(),
                         function: crate::types::FunctionCall {
@@ -327,9 +331,34 @@ impl AnthropicClient {
                 },
                 finish_reason: None,
             }],
-            usage: None,
+            usage,
         })
     }
+}
+
+fn extract_anthropic_stream_usage(event: &serde_json::Value) -> Option<crate::types::Usage> {
+    let usage = event.get("usage").or_else(|| {
+        event
+            .get("message")
+            .and_then(|message| message.get("usage"))
+    })?;
+    let input = usage["input_tokens"]
+        .as_u64()
+        .map(|value| value.min(u32::MAX as u64) as u32);
+    let output = usage["output_tokens"]
+        .as_u64()
+        .map(|value| value.min(u32::MAX as u64) as u32);
+    if input.is_none() && output.is_none() {
+        return None;
+    }
+    Some(crate::types::Usage {
+        prompt_tokens: input,
+        completion_tokens: output,
+        total_tokens: match (input, output) {
+            (Some(input), Some(output)) => Some(input.saturating_add(output)),
+            _ => None,
+        },
+    })
 }
 
 /// 从 messages 中提取 system 消息内容（Anthropic API 要求 system 在顶层）
@@ -404,6 +433,71 @@ mod tests {
             choice.message.as_ref().unwrap().content.as_deref(),
             Some("Hello, world!")
         );
+    }
+
+    #[test]
+    fn streaming_tool_use_preserves_index_and_partial_json() {
+        let start = serde_json::json!({
+            "type": "content_block_start",
+            "index": 1,
+            "content_block": {
+                "type": "tool_use",
+                "id": "tool_1",
+                "name": "otherone.call_agent",
+                "input": {}
+            }
+        });
+        let start =
+            AnthropicClient::convert_anthropic_event_to_chat_response(&start.to_string()).unwrap();
+        let start_call = &start.choices[0]
+            .delta
+            .as_ref()
+            .unwrap()
+            .tool_calls
+            .as_ref()
+            .unwrap()[0];
+        assert_eq!(start_call.index, Some(1));
+        assert_eq!(start_call.id, "tool_1");
+        assert_eq!(start_call.function.name, "otherone.call_agent");
+
+        let delta = serde_json::json!({
+            "type": "content_block_delta",
+            "index": 1,
+            "delta": {
+                "type": "input_json_delta",
+                "partial_json": "{\"agent\":\"worker\"}"
+            }
+        });
+        let delta =
+            AnthropicClient::convert_anthropic_event_to_chat_response(&delta.to_string()).unwrap();
+        let delta_call = &delta.choices[0]
+            .delta
+            .as_ref()
+            .unwrap()
+            .tool_calls
+            .as_ref()
+            .unwrap()[0];
+        assert_eq!(delta_call.index, Some(1));
+        assert_eq!(delta_call.function.arguments, "{\"agent\":\"worker\"}");
+    }
+
+    #[test]
+    fn streaming_usage_is_extracted_from_start_and_delta_events() {
+        let start = serde_json::json!({
+            "type": "message_start",
+            "message": { "usage": { "input_tokens": 12, "output_tokens": 0 } }
+        });
+        let start =
+            AnthropicClient::convert_anthropic_event_to_chat_response(&start.to_string()).unwrap();
+        assert_eq!(start.usage.unwrap().prompt_tokens, Some(12));
+
+        let delta = serde_json::json!({
+            "type": "message_delta",
+            "usage": { "output_tokens": 4 }
+        });
+        let delta =
+            AnthropicClient::convert_anthropic_event_to_chat_response(&delta.to_string()).unwrap();
+        assert_eq!(delta.usage.unwrap().completion_tokens, Some(4));
     }
 
     #[test]

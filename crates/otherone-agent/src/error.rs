@@ -5,6 +5,33 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum AgentError {
+    #[error("Invalid configuration: {0}")]
+    InvalidConfiguration(String),
+
+    #[error("Agent not found: {0}")]
+    AgentNotFound(String),
+
+    #[error("Agent call denied: {caller} -> {target}")]
+    AgentCallDenied { caller: String, target: String },
+
+    #[error("Agent call cycle detected: {0}")]
+    AgentCallCycle(String),
+
+    #[error("Maximum Agent call depth exceeded: {0}")]
+    MaxDepthExceeded(usize),
+
+    #[error("Runtime budget exceeded: {0}")]
+    BudgetExceeded(String),
+
+    #[error("Session already has an active writer: {0}")]
+    SessionBusy(String),
+
+    #[error("Agent run timed out")]
+    TimedOut,
+
+    #[error("Agent run cancelled")]
+    Cancelled,
+
     #[error("AI error: {0}")]
     AiError(#[from] otherone_ai::error::AiError),
 
@@ -13,6 +40,12 @@ pub enum AgentError {
 
     #[error("Tool error: {0}")]
     ToolError(String),
+
+    #[error("Storage error: {0}")]
+    StorageError(String),
+
+    #[error("Internal error: {0}")]
+    Internal(String),
 
     #[error("Max iterations exceeded: {0}")]
     MaxIterationsExceeded(u32),

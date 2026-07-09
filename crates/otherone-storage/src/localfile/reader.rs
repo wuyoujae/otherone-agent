@@ -4,11 +4,22 @@
 
 use std::fs;
 use std::path::PathBuf;
-use std::sync::{OnceLock, RwLock};
+use std::sync::{Mutex, OnceLock, RwLock};
 
 use crate::types::{Session, SessionData, StorageFile};
 
 static STORAGE_ROOT: OnceLock<RwLock<Option<PathBuf>>> = OnceLock::new();
+static STORAGE_IO_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+
+pub(crate) fn storage_io_lock() -> &'static Mutex<()> {
+    STORAGE_IO_LOCK.get_or_init(|| Mutex::new(()))
+}
+
+#[cfg(test)]
+pub(crate) fn storage_test_lock() -> &'static Mutex<()> {
+    static TEST_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+    TEST_LOCK.get_or_init(|| Mutex::new(()))
+}
 
 pub fn set_storage_root(root: impl Into<PathBuf>) {
     let lock = STORAGE_ROOT.get_or_init(|| RwLock::new(None));
@@ -46,6 +57,13 @@ fn storage_root() -> PathBuf {
 /// 关联：被 ReadSessionData 和 GetAllSessions 调用
 /// 预期结果：返回解析后的存储数据对象，文件不存在时创建初始文件
 pub fn read_storage_file() -> Result<StorageFile, crate::error::StorageError> {
+    let _guard = storage_io_lock().lock().map_err(|_| {
+        crate::error::StorageError::ConfigError("local storage lock poisoned".to_string())
+    })?;
+    read_storage_file_unlocked()
+}
+
+pub(crate) fn read_storage_file_unlocked() -> Result<StorageFile, crate::error::StorageError> {
     let storage_path = get_storage_path();
 
     if !storage_path.exists() {
@@ -73,6 +91,15 @@ pub fn read_storage_file() -> Result<StorageFile, crate::error::StorageError> {
 /// 关联：被 localfile/writer.rs 调用
 /// 预期结果：成功写入数据到文件
 pub fn write_storage_file(data: &StorageFile) -> Result<(), crate::error::StorageError> {
+    let _guard = storage_io_lock().lock().map_err(|_| {
+        crate::error::StorageError::ConfigError("local storage lock poisoned".to_string())
+    })?;
+    write_storage_file_unlocked(data)
+}
+
+pub(crate) fn write_storage_file_unlocked(
+    data: &StorageFile,
+) -> Result<(), crate::error::StorageError> {
     let storage_path = get_storage_path();
 
     if let Some(parent) = storage_path.parent() {
@@ -89,11 +116,26 @@ pub fn write_storage_file(data: &StorageFile) -> Result<(), crate::error::Storag
 /// 关联：被用户调用，用于获取所有会话列表
 /// 预期结果：返回所有 session 的基本信息数组
 pub fn get_all_sessions() -> Result<Vec<Session>, crate::error::StorageError> {
+    get_all_sessions_with_internal(false)
+}
+
+/// 查询 session，可选择是否包含 Multi-Agent 内部子会话。
+pub fn get_all_sessions_with_internal(
+    include_internal: bool,
+) -> Result<Vec<Session>, crate::error::StorageError> {
     let data = read_storage_file()?;
 
     let sessions = data
         .sessions
         .iter()
+        .filter(|session| {
+            include_internal
+                || session
+                    .metadata
+                    .get("session_kind")
+                    .and_then(|value| value.as_str())
+                    != Some("agent_internal")
+        })
         .map(|s| Session {
             partition_key: s.partition_key.clone(),
             session_id: s.session_id.clone(),
@@ -159,6 +201,7 @@ mod tests {
 
     #[test]
     fn storage_root_can_be_configured_without_changing_current_dir() {
+        let _guard = storage_test_lock().lock().unwrap();
         let root = std::env::temp_dir().join(format!(
             "otherone-storage-root-{}",
             std::time::SystemTime::now()

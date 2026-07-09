@@ -11,6 +11,11 @@ use tokio::sync::mpsc;
 pub struct Otherone;
 
 impl Otherone {
+    /// 创建新的 Multi-Agent Runtime builder。
+    pub fn multi_agent_runtime() -> otherone_agent::multi_agent::AgentRuntimeBuilder {
+        otherone_agent::multi_agent::AgentRuntime::builder()
+    }
+
     /// Set the localfile storage root.
     ///
     /// By default localfile storage uses the current working directory. After
@@ -129,6 +134,12 @@ impl Otherone {
         otherone_storage::localfile::reader::get_all_sessions()
     }
 
+    /// 获取所有本地会话，包括 Multi-Agent 内部子会话。
+    pub fn get_all_sessions_including_internal(
+    ) -> Result<Vec<otherone_storage::types::Session>, otherone_storage::error::StorageError> {
+        otherone_storage::localfile::reader::get_all_sessions_with_internal(true)
+    }
+
     /// 获取所有会话（数据库）
     pub async fn get_all_sessions_from_database(
         config: &otherone_storage::types::DatabaseConfig,
@@ -143,6 +154,19 @@ impl Otherone {
         otherone_storage::database::reader::get_all_sessions_from_database_with_context(
             config,
             runtime_context,
+        )
+        .await
+    }
+
+    /// 获取数据库中的所有会话，包括 Multi-Agent 内部子会话。
+    pub async fn get_all_sessions_from_database_with_context_including_internal(
+        config: &otherone_storage::types::DatabaseConfig,
+        runtime_context: &otherone_storage::types::RuntimeContext,
+    ) -> Result<Vec<otherone_storage::types::Session>, otherone_storage::error::StorageError> {
+        otherone_storage::database::reader::get_all_sessions_from_database_with_context_and_internal(
+            config,
+            runtime_context,
+            true,
         )
         .await
     }
@@ -235,6 +259,17 @@ impl Otherone {
 }
 
 // 重新导出常用类型
+pub use otherone_agent::multi_agent::{
+    AccessPolicy, AgentAccessPolicy, AgentCallAuthorizer, AgentCallId, AgentCallRequest,
+    AgentCallResult, AgentDefinition, AgentEvent, AgentEventEnvelope, AgentId, AgentInput,
+    AgentLimits, AgentOutput, AgentRegistry, AgentRunCommand, AgentRunCommandSender,
+    AgentRunHandle as MultiAgentRunHandle, AgentRunRequest, AgentRunResult, AgentRuntime,
+    AgentRuntimeBuilder, AuthorizationDecision, ContextTransferPolicy, DefaultModelExecutor,
+    EventVisibility, InMemoryRunStore, MemoryPolicy, ModelExecutor, ModelProfile, ModelProfileId,
+    ModelRegistry, ModelSelector, ResultContract, RunId, RunLimitOverrides, RunOutcome, RunRecord,
+    RunStatus, RunUsage, RuntimeLimits, RuntimePolicy, SessionTarget, SkillAccessPolicy,
+    ToolAccessPolicy, AGENT_CALL_TOOL_NAME, MEMORY_RECALL_TOOL_NAME, MEMORY_STORE_TOOL_NAME,
+};
 pub use otherone_agent::types::{ContextLoadType as AgentContextLoadType, StorageType};
 pub use otherone_storage::database::mongodb;
 pub use otherone_storage::database::mysql;

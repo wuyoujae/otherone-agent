@@ -5,7 +5,7 @@
 use chrono::Utc;
 use uuid::Uuid;
 
-use super::reader::{read_storage_file, write_storage_file};
+use super::reader::{read_storage_file_unlocked, storage_io_lock, write_storage_file_unlocked};
 use crate::error::StorageError;
 use crate::types::StorageSession;
 
@@ -14,7 +14,10 @@ use crate::types::StorageSession;
 /// 关联：被用户调用，用于开始新的对话会话
 /// 预期结果：返回新生成的 session_id
 pub fn create_new_session() -> Result<String, StorageError> {
-    let mut data = read_storage_file()?;
+    let _guard = storage_io_lock()
+        .lock()
+        .map_err(|_| StorageError::ConfigError("local storage lock poisoned".to_string()))?;
+    let mut data = read_storage_file_unlocked()?;
 
     let session_id = Uuid::new_v4().to_string();
 
@@ -30,7 +33,7 @@ pub fn create_new_session() -> Result<String, StorageError> {
     };
 
     data.sessions.push(new_session);
-    write_storage_file(&data)?;
+    write_storage_file_unlocked(&data)?;
 
     Ok(session_id)
 }
@@ -46,8 +49,12 @@ pub fn write_entry_to_file(
     tools: Option<&serde_json::Value>,
     token_consumption: Option<u32>,
     create_at: Option<&str>,
+    metadata: &crate::types::AttributeBag,
 ) -> Result<(), StorageError> {
-    let mut data = read_storage_file()?;
+    let _guard = storage_io_lock()
+        .lock()
+        .map_err(|_| StorageError::ConfigError("local storage lock poisoned".to_string()))?;
+    let mut data = read_storage_file_unlocked()?;
 
     // 查找或创建 session
     let session = data
@@ -72,7 +79,7 @@ pub fn write_entry_to_file(
                     .unwrap_or_else(|| Utc::now().to_rfc3339()),
                 is_compaction: 1,
                 attributes: Default::default(),
-                metadata: Default::default(),
+                metadata: metadata.clone(),
             };
             s.entries.push(new_entry);
         }
@@ -92,7 +99,7 @@ pub fn write_entry_to_file(
                     .unwrap_or_else(|| Utc::now().to_rfc3339()),
                 is_compaction: 1,
                 attributes: Default::default(),
-                metadata: Default::default(),
+                metadata: metadata.clone(),
             };
 
             let new_session = StorageSession {
@@ -101,7 +108,7 @@ pub fn write_entry_to_file(
                 status: 0,
                 create_at: Utc::now().to_rfc3339(),
                 attributes: Default::default(),
-                metadata: Default::default(),
+                metadata: metadata.clone(),
                 entries: vec![new_entry],
                 compacted_entries: Vec::new(),
             };
@@ -109,7 +116,7 @@ pub fn write_entry_to_file(
         }
     }
 
-    write_storage_file(&data)?;
+    write_storage_file_unlocked(&data)?;
     Ok(())
 }
 
@@ -122,8 +129,12 @@ pub fn write_compacted_entry_to_file(
     summary: &str,
     trigger_entry_id: &str,
     create_at: Option<&str>,
+    metadata: &crate::types::AttributeBag,
 ) -> Result<(), StorageError> {
-    let mut data = read_storage_file()?;
+    let _guard = storage_io_lock()
+        .lock()
+        .map_err(|_| StorageError::ConfigError("local storage lock poisoned".to_string()))?;
+    let mut data = read_storage_file_unlocked()?;
 
     let session = data
         .sessions
@@ -142,7 +153,7 @@ pub fn write_compacted_entry_to_file(
             .unwrap_or_else(|| Utc::now().to_rfc3339()),
         status: 0,
         attributes: Default::default(),
-        metadata: Default::default(),
+        metadata: metadata.clone(),
     };
 
     match session {
@@ -156,7 +167,7 @@ pub fn write_compacted_entry_to_file(
                 status: 0,
                 create_at: Utc::now().to_rfc3339(),
                 attributes: Default::default(),
-                metadata: Default::default(),
+                metadata: metadata.clone(),
                 entries: Vec::new(),
                 compacted_entries: vec![new_compacted],
             };
@@ -164,7 +175,7 @@ pub fn write_compacted_entry_to_file(
         }
     }
 
-    write_storage_file(&data)?;
+    write_storage_file_unlocked(&data)?;
     Ok(())
 }
 
@@ -174,10 +185,20 @@ mod tests {
 
     #[test]
     fn test_create_new_session() {
+        let _guard = super::super::reader::storage_test_lock().lock().unwrap();
+        let root = std::env::temp_dir().join(format!(
+            "otherone-storage-session-test-{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        super::super::reader::set_storage_root(root);
         // 这个测试验证 session_id 的格式
         let session_id = create_new_session().unwrap();
         assert!(!session_id.is_empty());
         // UUID v4 格式：xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
         assert!(session_id.contains('-'));
+        super::super::reader::clear_storage_root();
     }
 }

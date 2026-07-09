@@ -190,13 +190,14 @@ pub async fn write_entry_mysql(
     sqlx::query(
         "INSERT INTO otherone_session \
          (partition_key, session_id, status, attributes_json, metadata_json) \
-         VALUES (?, ?, ?, ?, '{}') \
+         VALUES (?, ?, ?, ?, ?) \
          ON DUPLICATE KEY UPDATE session_id = session_id",
     )
     .bind(&runtime_context.partition_key)
     .bind(session_id)
     .bind(0i16)
     .bind(&attributes_json)
+    .bind(&metadata_json)
     .execute(&pool)
     .await?;
 

@@ -1776,7 +1776,7 @@ dependencies = [
 
 [[package]]
 name = "otherone"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "otherone-agent",
  "otherone-ai",
@@ -1792,26 +1792,30 @@ dependencies = [
 
 [[package]]
 name = "otherone-agent"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "anyhow",
  "async-trait",
+ "chrono",
  "futures",
  "otherone-ai",
  "otherone-context",
  "otherone-memory",
+ "otherone-skills",
  "otherone-storage",
  "otherone-tools",
  "serde",
  "serde_json",
  "thiserror",
  "tokio",
+ "tokio-util",
  "tracing",
+ "uuid",
 ]
 
 [[package]]
 name = "otherone-ai"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1828,7 +1832,7 @@ dependencies = [
 
 [[package]]
 name = "otherone-context"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1842,11 +1846,12 @@ dependencies = [
 
 [[package]]
 name = "otherone-mcp"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "anyhow",
  "async-trait",
  "otherone-ai",
+ "otherone-tools",
  "reqwest",
  "serde",
  "serde_json",
@@ -1857,7 +1862,7 @@ dependencies = [
 
 [[package]]
 name = "otherone-memory"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "chrono",
  "serde",
@@ -1868,7 +1873,7 @@ dependencies = [
 
 [[package]]
 name = "otherone-skills"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "anyhow",
  "serde",
@@ -1879,7 +1884,7 @@ dependencies = [
 
 [[package]]
 name = "otherone-storage"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "aes-gcm",
  "anyhow",
@@ -1900,14 +1905,17 @@ dependencies = [
 
 [[package]]
 name = "otherone-tools"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "anyhow",
+ "async-trait",
+ "futures",
  "otherone-ai",
  "serde",
  "serde_json",
  "thiserror",
  "tokio",
+ "tokio-util",
  "tracing",
 ]
 

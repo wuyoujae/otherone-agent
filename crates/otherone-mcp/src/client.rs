@@ -1,8 +1,8 @@
 // MCP 客户端 — 管理与单个 MCP server 的通信
 use std::process::Stdio;
 use std::sync::atomic::{AtomicU64, Ordering};
-use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
-use tokio::process::{Child, Command};
+use tokio::io::{AsyncBufRead, AsyncBufReadExt, AsyncWrite, AsyncWriteExt, BufReader, BufWriter};
+use tokio::process::{Child, ChildStdin, ChildStdout, Command};
 
 use crate::error::McpError;
 use crate::types::*;
@@ -12,6 +12,8 @@ pub struct McpClient {
     tools: Vec<McpTool>,
     request_id: AtomicU64,
     child_process: Option<Child>,
+    stdio_writer: Option<BufWriter<ChildStdin>>,
+    stdio_reader: Option<BufReader<ChildStdout>>,
     http_client: Option<reqwest::Client>,
 }
 
@@ -22,6 +24,8 @@ impl McpClient {
             tools: vec![],
             request_id: AtomicU64::new(0),
             child_process: None,
+            stdio_writer: None,
+            stdio_reader: None,
             http_client: None,
         }
     }
@@ -64,7 +68,8 @@ impl McpClient {
         }
         cmd.stdin(Stdio::piped())
             .stdout(Stdio::piped())
-            .stderr(Stdio::inherit());
+            .stderr(Stdio::inherit())
+            .kill_on_drop(true);
         let mut child = cmd
             .spawn()
             .map_err(|e| McpError::ConnectionError(format!("spawn: {}", e)))?;
@@ -76,39 +81,31 @@ impl McpClient {
             .stdout
             .take()
             .ok_or(McpError::ConnectionError("stdout".into()))?;
-        let mut w = tokio::io::BufWriter::new(stdin);
+        let mut w = BufWriter::new(stdin);
         let mut r = BufReader::new(stdout);
 
-        let init = serde_json::to_string(&self.build_request("initialize", Some(serde_json::json!({
+        let init = self.build_request("initialize", Some(serde_json::json!({
             "protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"otherone-mcp","version":"0.1.0"}
-        }))))? + "\n";
-        w.write_all(init.as_bytes()).await?;
-        w.flush().await?;
-        let mut line = String::new();
-        r.read_line(&mut line)
-            .await
-            .map_err(|e| McpError::ProtocolError(format!("read: {}", e)))?;
-        let _: JsonRpcResponse = serde_json::from_str(&line)
-            .map_err(|e| McpError::ProtocolError(format!("parse: {}", e)))?;
+        })));
+        write_json_line(&mut w, &init).await?;
+        let init_response = read_json_rpc_response(&mut r, init.id).await?;
+        ensure_success(&init_response)?;
 
         let notif = r#"{"jsonrpc":"2.0","method":"notifications/initialized"}"#.to_string() + "\n";
         w.write_all(notif.as_bytes()).await?;
         w.flush().await?;
 
-        let tools_req = serde_json::to_string(&self.build_request("tools/list", None))? + "\n";
-        w.write_all(tools_req.as_bytes()).await?;
-        w.flush().await?;
-        let mut line2 = String::new();
-        r.read_line(&mut line2)
-            .await
-            .map_err(|e| McpError::ProtocolError(format!("read: {}", e)))?;
-        let resp: JsonRpcResponse = serde_json::from_str(&line2)
-            .map_err(|e| McpError::ProtocolError(format!("parse: {}", e)))?;
+        let tools_req = self.build_request("tools/list", None);
+        write_json_line(&mut w, &tools_req).await?;
+        let resp = read_json_rpc_response(&mut r, tools_req.id).await?;
+        ensure_success(&resp)?;
         if let Some(result) = resp.result {
             let tl: ToolsListResult = serde_json::from_value(result)
                 .map_err(|e| McpError::ProtocolError(format!("tools: {}", e)))?;
             self.tools = tl.tools;
         }
+        self.stdio_writer = Some(w);
+        self.stdio_reader = Some(r);
         self.child_process = Some(child);
         Ok(())
     }
@@ -173,7 +170,7 @@ impl McpClient {
     }
 
     pub async fn call_tool(
-        &self,
+        &mut self,
         name: &str,
         arguments: &serde_json::Value,
     ) -> Result<serde_json::Value, McpError> {
@@ -204,9 +201,22 @@ impl McpClient {
                 )));
             }
             Ok(resp.result.unwrap_or(serde_json::Value::Null))
+        } else if self.stdio_writer.is_some() && self.stdio_reader.is_some() {
+            let writer = self
+                .stdio_writer
+                .as_mut()
+                .ok_or_else(|| McpError::ConnectionError("stdio writer is closed".into()))?;
+            write_json_line(writer, &req).await?;
+            let reader = self
+                .stdio_reader
+                .as_mut()
+                .ok_or_else(|| McpError::ConnectionError("stdio reader is closed".into()))?;
+            let resp = read_json_rpc_response(reader, req.id).await?;
+            ensure_success(&resp)?;
+            Ok(resp.result.unwrap_or(serde_json::Value::Null))
         } else {
-            Err(McpError::ToolCallError(
-                "stdio not supported for subsequent calls".into(),
+            Err(McpError::ConnectionError(
+                "MCP client is not initialized".into(),
             ))
         }
     }
@@ -233,8 +243,76 @@ impl McpClient {
         if let Some(ref mut c) = self.child_process {
             let _ = c.kill().await;
         }
+        self.stdio_writer = None;
+        self.stdio_reader = None;
         self.child_process = None;
         self.http_client = None;
         Ok(())
+    }
+}
+
+async fn write_json_line<W, T>(writer: &mut W, value: &T) -> Result<(), McpError>
+where
+    W: AsyncWrite + Unpin,
+    T: serde::Serialize,
+{
+    let line = serde_json::to_string(value)? + "\n";
+    writer.write_all(line.as_bytes()).await?;
+    writer.flush().await?;
+    Ok(())
+}
+
+async fn read_json_rpc_response<R>(
+    reader: &mut R,
+    expected_id: u64,
+) -> Result<JsonRpcResponse, McpError>
+where
+    R: AsyncBufRead + Unpin,
+{
+    loop {
+        let mut line = String::new();
+        let read = reader
+            .read_line(&mut line)
+            .await
+            .map_err(|error| McpError::ProtocolError(format!("read: {error}")))?;
+        if read == 0 {
+            return Err(McpError::ConnectionError(
+                "MCP stdio server closed stdout".to_string(),
+            ));
+        }
+        let value: serde_json::Value = serde_json::from_str(&line)
+            .map_err(|error| McpError::ProtocolError(format!("parse: {error}")))?;
+        if value.get("id").and_then(|id| id.as_u64()) != Some(expected_id) {
+            continue;
+        }
+        return serde_json::from_value(value)
+            .map_err(|error| McpError::ProtocolError(format!("response: {error}")));
+    }
+}
+
+fn ensure_success(response: &JsonRpcResponse) -> Result<(), McpError> {
+    if let Some(error) = &response.error {
+        return Err(McpError::ToolCallError(format!(
+            "[{}]: {}",
+            error.code, error.message
+        )));
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn stdio_response_reader_skips_notifications_and_matches_request_id() {
+        let input = concat!(
+            "{\"jsonrpc\":\"2.0\",\"method\":\"notifications/tools/list_changed\"}\n",
+            "{\"jsonrpc\":\"2.0\",\"id\":7,\"result\":{\"ok\":true}}\n"
+        );
+        let mut reader = BufReader::new(input.as_bytes());
+        let response = read_json_rpc_response(&mut reader, 7).await.unwrap();
+        assert_eq!(response.id, Some(7));
+        assert_eq!(response.result.unwrap()["ok"], true);
     }
 }

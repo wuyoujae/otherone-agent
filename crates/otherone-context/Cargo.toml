@@ -1,6 +1,6 @@
 [package]
 name = "otherone-context"
-version = "0.4.0"
+version = "0.5.0"
 edition = "2021"
 license = "MIT"
 readme = "../../README.md"
@@ -17,5 +17,5 @@ thiserror = { workspace = true }
 anyhow = { workspace = true }
 async-trait = { workspace = true }
 tracing = { workspace = true }
-otherone-ai = { version = "0.4.0", path = "../otherone-ai" }
-otherone-storage = { version = "0.4.0", path = "../otherone-storage" }
+otherone-ai = { version = "0.5.0", path = "../otherone-ai" }
+otherone-storage = { version = "0.5.0", path = "../otherone-storage" }

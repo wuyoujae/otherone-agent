@@ -8,6 +8,10 @@ pub mod types;
 
 use client::McpClient;
 use error::McpError;
+use otherone_tools::types::{ToolCallContext, ToolError};
+use otherone_tools::{ToolHandler, ToolRegistration};
+use std::sync::Arc;
+use tokio::sync::Mutex;
 use types::McpServerConfig;
 
 /// MCP 管理器
@@ -50,11 +54,11 @@ impl McpManager {
     /// 关联：被 process_tools 调用
     /// 预期结果：找到匹配工具并调用，未找到返回错误
     pub async fn call_tool(
-        &self,
+        &mut self,
         tool_name: &str,
         arguments: &serde_json::Value,
     ) -> Result<serde_json::Value, McpError> {
-        for client in &self.clients {
+        for client in &mut self.clients {
             if client.has_tool(tool_name) {
                 return client.call_tool(tool_name, arguments).await;
             }
@@ -82,6 +86,46 @@ impl McpManager {
     pub fn tool_count(&self) -> usize {
         self.clients.iter().map(|c| c.tool_count()).sum()
     }
+
+    /// 将所有已发现的 MCP 工具转换成 Multi-Agent Runtime 的异步工具注册项。
+    /// 返回的 handler 共享同一个 manager，并按 manager 锁保证客户端状态安全。
+    pub fn into_tool_registrations(self) -> Vec<ToolRegistration> {
+        let definitions = self.get_all_tools();
+        let manager = Arc::new(Mutex::new(self));
+        definitions
+            .into_iter()
+            .map(|definition| {
+                let tool_name = definition.function.name.clone();
+                ToolRegistration::new(
+                    definition,
+                    Arc::new(McpToolHandler {
+                        manager: Arc::clone(&manager),
+                        tool_name,
+                    }),
+                )
+            })
+            .collect()
+    }
+}
+
+struct McpToolHandler {
+    manager: Arc<Mutex<McpManager>>,
+    tool_name: String,
+}
+
+#[async_trait::async_trait]
+impl ToolHandler for McpToolHandler {
+    async fn call(
+        &self,
+        arguments: serde_json::Value,
+        _context: ToolCallContext,
+    ) -> Result<serde_json::Value, ToolError> {
+        let mut manager = self.manager.lock().await;
+        manager
+            .call_tool(&self.tool_name, &arguments)
+            .await
+            .map_err(|error| ToolError::recoverable(error.to_string()))
+    }
 }
 
 impl Default for McpManager {
@@ -106,5 +150,11 @@ mod tests {
         let manager = McpManager::new();
         assert_eq!(manager.server_count(), 0);
         assert_eq!(manager.tool_count(), 0);
+    }
+
+    #[test]
+    fn empty_manager_produces_no_runtime_tool_registrations() {
+        let manager = McpManager::new();
+        assert!(manager.into_tool_registrations().is_empty());
     }
 }

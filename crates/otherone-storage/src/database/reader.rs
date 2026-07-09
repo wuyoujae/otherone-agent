@@ -15,6 +15,17 @@ pub async fn get_all_sessions_from_database_with_context(
     config: &DatabaseConfig,
     runtime_context: &RuntimeContext,
 ) -> Result<Vec<Session>, StorageError> {
+    let sessions =
+        get_all_sessions_from_database_with_context_and_internal(config, runtime_context, false)
+            .await?;
+    Ok(sessions)
+}
+
+pub async fn get_all_sessions_from_database_with_context_and_internal(
+    config: &DatabaseConfig,
+    runtime_context: &RuntimeContext,
+    include_internal: bool,
+) -> Result<Vec<Session>, StorageError> {
     runtime_context
         .validate()
         .map_err(StorageError::ConfigError)?;
@@ -55,6 +66,14 @@ pub async fn get_all_sessions_from_database_with_context(
                 }
             },
         )
+        .filter(|session| {
+            include_internal
+                || session
+                    .metadata
+                    .get("session_kind")
+                    .and_then(|value| value.as_str())
+                    != Some("agent_internal")
+        })
         .collect();
 
     pool.close().await;
